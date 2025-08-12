@@ -1,4 +1,5 @@
 import { Body, Controller, HttpException, HttpStatus, Post, Req, UseGuards, ValidationPipe } from '@nestjs/common';
+import { JwtService } from '@nestjs/jwt';
 import { ApiBody, ApiConflictResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { Request } from 'express';
@@ -13,6 +14,7 @@ export class AuthController {
   constructor(
     private readonly usersService: UsersService,
     private readonly authService: AuthService,
+    private readonly jwtService: JwtService,
   ) { }
 
   @Post('login')
@@ -30,7 +32,7 @@ export class AuthController {
   @ApiResponse({ status: 201, description: 'JWT token returned on success' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Req() req: Request) {
-    return this.authService.generateJwt(req.user as any);
+    return this.authService.generateTokensAndSave((req.user as any).id);
   }
 
   @Post('register')
@@ -41,7 +43,7 @@ export class AuthController {
   async register(@Body(ValidationPipe) createUserDto: CreateUserDto) {
     try {
       const user = await this.usersService.create(createUserDto);
-      return this.authService.generateJwt(user);
+      return this.authService.generateTokensAndSave(user.id);
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
@@ -52,6 +54,56 @@ export class AuthController {
         }
       }
       throw error;
+    }
+  }
+
+  @Post('refresh')
+  @ApiOperation({ summary: 'Refresh access token using refresh token' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        refresh_token: { type: 'string' },
+      },
+      required: ['refresh_token'],
+    },
+  })
+  @ApiResponse({ status: 201, description: 'New tokens returned' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
+  async refresh(@Body('refresh_token') refreshToken: string) {
+    try {
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: process.env.JWT_REFRESH_SECRET
+      });
+      const userId = payload.sub;
+
+      return await this.authService.rotateRefreshToken(userId, refreshToken);
+    } catch {
+      throw new HttpException(
+        'Invalid or expired refresh token',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+  }
+
+  @Post('logout')
+  @ApiOperation({ summary: 'Logout user and revoke refresh tokens' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        refresh_token: { type: 'string' },
+      },
+      required: ['refresh_token'],
+    },
+  })
+  @ApiResponse({ status: 200, description: 'Tokens revoked successfully' })
+  @Post('logout')
+  async logout(@Body('refresh_token') refreshToken: string) {
+    try {
+      return await this.authService.logout(refreshToken);
+    } catch (error) {
+      throw new HttpException(error.message, HttpStatus.UNAUTHORIZED);
     }
   }
 }

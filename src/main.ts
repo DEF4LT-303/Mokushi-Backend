@@ -22,8 +22,8 @@ async function bootstrap() {
 
   // Swagger config
   const config = new DocumentBuilder()
-    .setTitle('API Marketplace')
-    .setDescription('Backend API documentation for the API Marketplace project')
+    .setTitle('Mokushi Endpoints')
+    .setDescription('Backend API documentation for Mokushi')
     .setVersion('1.0')
     .addBearerAuth()
     .build();
