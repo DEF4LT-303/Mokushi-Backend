@@ -22,5 +22,5 @@ export class CreateUserDto {
     example: 'John Doe',
   })
   @IsNotEmpty()
-  name: string;
+  fullName: string;
 }

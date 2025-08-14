@@ -1,8 +1,9 @@
-import { Body, Controller, HttpException, HttpStatus, Post, Req, UseGuards, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Get, HttpException, HttpStatus, Post, Req, Res, UseGuards, ValidationPipe } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { AuthGuard } from '@nestjs/passport';
 import { ApiBody, ApiConflictResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { UsersService } from 'src/users/users.service';
 import { AuthService } from './auth.service';
@@ -57,7 +58,7 @@ export class AuthController {
     }
   }
 
-  @Post('refresh')
+  @Post('refresh-token')
   @ApiOperation({ summary: 'Refresh access token using refresh token' })
   @ApiBody({
     schema: {
@@ -98,12 +99,43 @@ export class AuthController {
     },
   })
   @ApiResponse({ status: 200, description: 'Tokens revoked successfully' })
-  @Post('logout')
   async logout(@Body('refresh_token') refreshToken: string) {
+    console.log('Received token:', refreshToken);
+
     try {
       return await this.authService.logout(refreshToken);
     } catch (error) {
       throw new HttpException(error.message, HttpStatus.UNAUTHORIZED);
+    }
+  }
+
+  @Get('google')
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Initiate Google OAuth login' })
+  async googleAuth() {
+    // This route will redirect to Google OAuth
+  }
+
+  @Get('google/callback')
+  @UseGuards(AuthGuard('google'))
+  @ApiOperation({ summary: 'Google OAuth callback - handle authentication' })
+  @ApiResponse({ status: 200, description: 'Google authentication successful' })
+  async googleAuthCallback(@Req() req: Request, @Res() res: Response) {
+    try {
+      const googleProfile = req.user as any;
+      const tokens = await this.authService.handleGoogleAuth(googleProfile);
+
+      // Redirect to frontend with tokens
+      const redirectUrl = process.env.FRONTEND_REDIRECT_URL || 'http://localhost:3000';
+      const queryParams = new URLSearchParams({
+        access_token: tokens.access_token,
+        refresh_token: tokens.refresh_token,
+      });
+
+      res.redirect(`${redirectUrl}?${queryParams.toString()}`);
+    } catch (error) {
+      const errorRedirectUrl = process.env.FRONTEND_ERROR_REDIRECT_URL || 'http://localhost:3000/error';
+      res.redirect(errorRedirectUrl);
     }
   }
 }
