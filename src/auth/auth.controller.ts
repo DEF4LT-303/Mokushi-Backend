@@ -100,7 +100,6 @@ export class AuthController {
   })
   @ApiResponse({ status: 200, description: 'Tokens revoked successfully' })
   async logout(@Body('refresh_token') refreshToken: string) {
-    console.log('Received token:', refreshToken);
 
     try {
       return await this.authService.logout(refreshToken);
@@ -126,7 +125,7 @@ export class AuthController {
       const tokens = await this.authService.handleGoogleAuth(googleProfile);
 
       // Redirect to frontend with tokens
-      const redirectUrl = process.env.FRONTEND_REDIRECT_URL || 'http://localhost:3000';
+      const redirectUrl = process.env.FRONTEND_REDIRECT_URL || 'http://localhost:3000/oauth-callback';
       const queryParams = new URLSearchParams({
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
@@ -137,5 +136,11 @@ export class AuthController {
       const errorRedirectUrl = process.env.FRONTEND_ERROR_REDIRECT_URL || 'http://localhost:3000/error';
       res.redirect(errorRedirectUrl);
     }
+  }
+
+  @Get('me')
+  @UseGuards(AuthGuard('jwt'))
+  async getCurrentUser(@Req() req) {
+    return req.user;
   }
 }

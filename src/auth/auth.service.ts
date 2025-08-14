@@ -115,7 +115,6 @@ export class AuthService {
       const payload = this.jwtService.verify(refreshToken, {
         secret: process.env.JWT_REFRESH_SECRET,
       });
-      console.log('Payload:', payload);
       const userId = payload.sub;
       const hashedToken = hashToken(refreshToken);
 
