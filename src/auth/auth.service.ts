@@ -145,5 +145,9 @@ export class AuthService {
     // Generate JWT tokens
     return this.generateTokensAndSave(user.id);
   }
+
+  async getCurrentUser(userId: string) {
+    return this.usersService.findById(userId);
+  }
 }
 
