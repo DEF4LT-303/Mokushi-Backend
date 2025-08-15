@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { SafeUser, safeUserSelect } from 'prisma/safe-user.select';
 import { DatabaseService } from 'src/database/database.service';
 import { CreateUserDto } from './dto/create-user.dto';
 
@@ -19,17 +20,27 @@ export class UsersService {
     });
   }
 
-  findAll(role?: Role) {
+  findAll(role?: Role): Promise<SafeUser[]> {
     return this.databaseService.user.findMany({
       where: {
         role: role ? { equals: role } : undefined,
       },
+      select: safeUserSelect,
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  findOne(id: string) {
+  findById(id: string): Promise<SafeUser | null> {
     return this.databaseService.user.findUnique({
       where: { id },
+      select: safeUserSelect,
+    });
+  }
+
+  findByEmail(email: string): Promise<SafeUser | null> {
+    return this.databaseService.user.findUnique({
+      where: { email },
+      select: safeUserSelect,
     });
   }
 
@@ -44,5 +55,47 @@ export class UsersService {
     return this.databaseService.user.delete({
       where: { id },
     });
+  }
+
+  async findOrCreateGoogleUser(googleProfile: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    picture: string;
+  }) {
+    const { email, firstName, lastName, picture } = googleProfile;
+
+    // Check if user already exists
+    let user = await this.databaseService.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      // Create new user with Google profile data
+      // For now, use the name field as a fallback since firstName/lastName might not exist yet
+      const fullName = `${firstName} ${lastName}`.trim();
+
+      user = await this.databaseService.user.create({
+        data: {
+          email,
+          fullName,
+          firstName,
+          lastName,
+          picture,
+          provider: 'google'
+        },
+      });
+    } else {
+      // Update existing user's name if it changed
+      const fullName = `${firstName} ${lastName}`.trim();
+      if (user.fullName !== fullName) {
+        user = await this.databaseService.user.update({
+          where: { id: user.id },
+          data: { fullName },
+        });
+      }
+    }
+
+    return user;
   }
 }

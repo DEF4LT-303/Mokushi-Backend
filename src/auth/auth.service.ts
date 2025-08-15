@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { hashToken, parseExpiryToDate } from 'src/common/utils/jwt.helpers';
 import { DatabaseService } from 'src/database/database.service';
+import { UsersService } from 'src/users/users.service';
 import { AuthPayloadDto } from './dto/auth.dto';
 
 @Injectable()
@@ -10,6 +11,7 @@ export class AuthService {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly jwtService: JwtService,
+    private readonly usersService: UsersService,
   ) { }
 
   async validateUser(authPayloadDto: AuthPayloadDto) {
@@ -20,6 +22,10 @@ export class AuthService {
     });
 
     if (!user) return null;
+
+    if (!user.password) {
+      throw new Error('This account is linked to a third-party provider. Please use the respective OAuth login method.');
+    }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) return null;
@@ -53,9 +59,19 @@ export class AuthService {
       },
     });
 
+    const user = await this.usersService.findById(userId);
+
     return {
       access_token: accessToken,
       refresh_token: refreshToken,
+      user: {
+        id: user?.id,
+        email: user?.email,
+        firstName: user?.firstName,
+        lastName: user?.lastName,
+        fullName: user?.fullName,
+        picture: user?.picture,
+      },
     };
   }
 
@@ -96,7 +112,9 @@ export class AuthService {
 
   async logout(refreshToken: string) {
     try {
-      const payload = this.jwtService.verify(refreshToken);
+      const payload = this.jwtService.verify(refreshToken, {
+        secret: process.env.JWT_REFRESH_SECRET,
+      });
       const userId = payload.sub;
       const hashedToken = hashToken(refreshToken);
 
@@ -113,6 +131,23 @@ export class AuthService {
     } catch {
       throw new Error('Invalid refresh token');
     }
+  }
+
+  async handleGoogleAuth(googleProfile: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    picture: string;
+  }) {
+    // Find or create user from Google profile
+    const user = await this.usersService.findOrCreateGoogleUser(googleProfile);
+
+    // Generate JWT tokens
+    return this.generateTokensAndSave(user.id);
+  }
+
+  async getCurrentUser(userId: string) {
+    return this.usersService.findById(userId);
   }
 }
 

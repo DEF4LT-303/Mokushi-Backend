@@ -36,8 +36,8 @@ export class UsersController {
   @ApiOperation({ summary: 'Get user by ID' })
   @ApiOkResponse({ description: 'User fetched successfully' })
   @ApiNotFoundResponse({ description: 'User not found' })
-  async findOne(@Param('id') id: string) {
-    const user = await this.usersService.findOne(id);
+  async findById(@Param('id') id: string) {
+    const user = await this.usersService.findById(id);
     if (!user) {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
@@ -64,7 +64,7 @@ export class UsersController {
       throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
     }
 
-    const user = await this.usersService.findOne(id);
+    const user = await this.usersService.findById(id);
     if (!user) {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }
@@ -95,7 +95,7 @@ export class UsersController {
       throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
     }
 
-    const user = await this.usersService.findOne(id);
+    const user = await this.usersService.findById(id);
     if (!user) {
       throw new HttpException('User not found', HttpStatus.NOT_FOUND);
     }

@@ -5,6 +5,7 @@ import { DatabaseModule } from 'src/database/database.module';
 import { UsersModule } from 'src/users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { localStrategy } from './strategies/local.strategy';
 
@@ -19,6 +20,6 @@ import { localStrategy } from './strategies/local.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, localStrategy, JwtStrategy],
+  providers: [AuthService, localStrategy, JwtStrategy, GoogleStrategy],
 })
 export class AuthModule { }
