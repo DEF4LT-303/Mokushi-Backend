@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { SafeUser, safeUserSelect } from 'prisma/safe-user.select';
 import { DatabaseService } from 'src/database/database.service';
 import { CreateUserDto } from './dto/create-user.dto';
 
@@ -19,23 +20,27 @@ export class UsersService {
     });
   }
 
-  findAll(role?: Role) {
+  findAll(role?: Role): Promise<SafeUser[]> {
     return this.databaseService.user.findMany({
       where: {
         role: role ? { equals: role } : undefined,
       },
+      select: safeUserSelect,
+      orderBy: { createdAt: 'desc' },
     });
   }
 
-  findById(id: string) {
+  findById(id: string): Promise<SafeUser | null> {
     return this.databaseService.user.findUnique({
       where: { id },
+      select: safeUserSelect,
     });
   }
 
-  findByEmail(email: string) {
+  findByEmail(email: string): Promise<SafeUser | null> {
     return this.databaseService.user.findUnique({
       where: { email },
+      select: safeUserSelect,
     });
   }
 
