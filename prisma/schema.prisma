@@ -20,15 +20,18 @@ enum Role {
 }
 
 model User {
-  id        String   @id @default(cuid())
+  id        String  @id @default(cuid())
   fullName  String?
   firstName String?
   lastName  String?
-  email     String   @unique
+  email     String  @unique
   password  String?
   picture   String?
-  role      Role     @default(USER)
-  provider  String   @default("local")
+  role      Role    @default(USER)
+  provider  String  @default("local")
+
+  userAttempts userAttempts[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -45,4 +48,135 @@ model RefreshToken {
   revoked   Boolean  @default(false)
 
   @@index([userId])
+}
+
+enum JlptLevel {
+  N4
+  N5
+}
+
+enum ModuleType {
+  READING
+  LISTENING
+}
+
+model Module {
+  id          String     @id @default(cuid())
+  slug        String     @unique
+  name        String
+  description String
+  jlptLevel   JlptLevel
+  type        ModuleType
+  questions   Question[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([slug])
+}
+
+enum QuestionType {
+  MULTIPLE_CHOICE
+  TRUE_FALSE
+  FILL_IN_THE_BLANK
+}
+
+enum LessonType {
+  Grammar
+  Vocabulary
+  Kanji
+}
+
+model Question {
+  id            String       @id @default(cuid())
+  content       String
+  options       String[]
+  correctAnswer String
+  explanation   String?
+  type          QuestionType
+  lessonType    LessonType
+
+  module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  moduleId String
+
+  quizzes QuizQuestion[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([moduleId])
+}
+
+model Quiz {
+  id        String    @id @default(cuid())
+  title     String
+  jlptLevel JlptLevel
+
+  questions    QuizQuestion[]
+  userAttempts userAttempts[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([id])
+}
+
+model QuizQuestion {
+  id    String @id @default(cuid())
+  order Int
+
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quizId String
+
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  questionId String
+
+  userAnswers UserAnswers[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([quizId, questionId])
+  @@index([quizId])
+  @@index([questionId])
+}
+
+model userAttempts {
+  id String @id @default(cuid())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+
+  quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quizId String
+
+  userAnswers UserAnswers[]
+
+  score     Int
+  completed Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([quizId])
+}
+
+model UserAnswers {
+  id String @id @default(cuid())
+
+  userTestAttempt userAttempts @relation(fields: [userAttemptId], references: [id], onDelete: Cascade)
+  userAttemptId   String
+
+  quizQuestion   QuizQuestion @relation(fields: [quizQuestionId], references: [id], onDelete: Cascade)
+  quizQuestionId String
+
+  answer  String
+  correct Boolean
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userAttemptId])
+  @@index([quizQuestionId])
 }
