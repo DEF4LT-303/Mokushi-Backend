@@ -32,8 +32,21 @@ export class AuthController {
   })
   @ApiResponse({ status: 201, description: 'JWT token returned on success' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  async login(@Req() req: Request) {
-    return this.authService.generateTokensAndSave((req.user as any).id);
+  async login(@Req() req: Request, @Res() res: Response) {
+    const tokens = await this.authService.generateTokensAndSave((req.user as any).id);
+    res.cookie('access_token', tokens.access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 1000 * 60 * 15 // 15 minutes
+    });
+    res.cookie('refresh_token', tokens.refresh_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 1000 * 60 * 60 * 24 * 7 // 7 days
+    });
+    return res.json({ user: tokens.user });
   }
 
   @Post('register')
@@ -124,13 +137,25 @@ export class AuthController {
       const googleProfile = req.user as any;
       const tokens = await this.authService.handleGoogleAuth(googleProfile);
 
-      // Redirect to frontend with tokens
-      const redirectUrl = process.env.FRONTEND_REDIRECT_URL || 'http://localhost:3000/oauth-callback';
-      const queryParams = new URLSearchParams({
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
+      // Set tokens in HttpOnly cookies
+      res.cookie('access_token', tokens.access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 1000 * 60 * 15 // 15 minutes
+      });
+      res.cookie('refresh_token', tokens.refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: 1000 * 60 * 60 * 24 * 7 // 7 days
       });
 
+      // Redirect to frontend with only user info
+      const redirectUrl = process.env.FRONTEND_REDIRECT_URL || 'http://localhost:3000/oauth-callback';
+      const queryParams = new URLSearchParams({
+        user: JSON.stringify(tokens.user)
+      });
       res.redirect(`${redirectUrl}?${queryParams.toString()}`);
     } catch (error) {
       const errorRedirectUrl = process.env.FRONTEND_ERROR_REDIRECT_URL || 'http://localhost:3000/error';
