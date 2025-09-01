@@ -62,8 +62,8 @@ export class AuthService {
     const user = await this.usersService.findById(userId);
 
     return {
-      access_token: accessToken,
-      refresh_token: refreshToken,
+      accessToken,
+      refreshToken,
       user: {
         id: user?.id,
         email: user?.email,
