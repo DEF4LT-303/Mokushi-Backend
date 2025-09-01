@@ -4,6 +4,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { ApiBody, ApiConflictResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { Request, Response } from 'express';
+import { clearAuthCookies, setAuthCookies } from 'src/common/utils/cookie.helpers';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { UsersService } from 'src/users/users.service';
 import { AuthService } from './auth.service';
@@ -20,7 +21,7 @@ export class AuthController {
 
   @Post('login')
   @UseGuards(LocalGuard)
-  @ApiOperation({ summary: 'Login user and return JWT token' })
+  @ApiOperation({ summary: 'Login user and return JWT token in cookies' })
   @ApiBody({
     schema: {
       type: 'object',
@@ -30,21 +31,39 @@ export class AuthController {
       },
     },
   })
-  @ApiResponse({ status: 201, description: 'JWT token returned on success' })
+  @ApiResponse({ status: 201, description: 'User logged in successfully with cookies set' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
-  async login(@Req() req: Request) {
-    return this.authService.generateTokensAndSave((req.user as any).id);
+  async login(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
+    const result = await this.authService.generateTokensAndSave((req.user as any).id);
+
+    // Set secure HTTP-only cookies
+    const isProduction = process.env.NODE_ENV === 'production';
+    setAuthCookies(res, result.accessToken, result.refreshToken, isProduction);
+
+    return {
+      message: 'Login successful',
+      user: result.user,
+    };
   }
 
   @Post('register')
-  @ApiOperation({ summary: 'Register a new user and return JWT token' })
+  @ApiOperation({ summary: 'Register a new user and return JWT token in cookies' })
   @ApiBody({ type: CreateUserDto })
-  @ApiResponse({ status: 201, description: 'User registered successfully' })
+  @ApiResponse({ status: 201, description: 'User registered successfully with cookies set' })
   @ApiConflictResponse({ description: 'Email already exists' })
-  async register(@Body(ValidationPipe) createUserDto: CreateUserDto) {
+  async register(@Body(ValidationPipe) createUserDto: CreateUserDto, @Res({ passthrough: true }) res: Response) {
     try {
       const user = await this.usersService.create(createUserDto);
-      return this.authService.generateTokensAndSave(user.id);
+      const result = await this.authService.generateTokensAndSave(user.id);
+
+      // Set secure HTTP-only cookies
+      const isProduction = process.env.NODE_ENV === 'production';
+      setAuthCookies(res, result.accessToken, result.refreshToken, isProduction);
+
+      return {
+        message: 'Registration successful',
+        user: result.user,
+      };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {
         if (error.code === 'P2002') {
@@ -59,26 +78,31 @@ export class AuthController {
   }
 
   @Post('refresh-token')
-  @ApiOperation({ summary: 'Refresh access token using refresh token' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        refresh_token: { type: 'string' },
-      },
-      required: ['refresh_token'],
-    },
-  })
-  @ApiResponse({ status: 201, description: 'New tokens returned' })
+  @ApiOperation({ summary: 'Refresh access token using refresh token from cookie' })
+  @ApiResponse({ status: 201, description: 'New tokens returned in cookies' })
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
-  async refresh(@Body('refresh_token') refreshToken: string) {
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     try {
+      const refreshToken = req.cookies?.refresh_token;
+      if (!refreshToken) {
+        throw new HttpException('Refresh token not found', HttpStatus.UNAUTHORIZED);
+      }
+
       const payload = this.jwtService.verify(refreshToken, {
         secret: process.env.JWT_REFRESH_SECRET
       });
       const userId = payload.sub;
 
-      return await this.authService.rotateRefreshToken(userId, refreshToken);
+      const result = await this.authService.rotateRefreshToken(userId, refreshToken);
+
+      // Set new secure HTTP-only cookies
+      const isProduction = process.env.NODE_ENV === 'production';
+      setAuthCookies(res, result.accessToken, result.refreshToken, isProduction);
+
+      return {
+        message: 'Tokens refreshed successfully',
+        user: result.user,
+      };
     } catch {
       throw new HttpException(
         'Invalid or expired refresh token',
@@ -89,21 +113,21 @@ export class AuthController {
 
   @Post('logout')
   @ApiOperation({ summary: 'Logout user and revoke refresh tokens' })
-  @ApiBody({
-    schema: {
-      type: 'object',
-      properties: {
-        refresh_token: { type: 'string' },
-      },
-      required: ['refresh_token'],
-    },
-  })
-  @ApiResponse({ status: 200, description: 'Tokens revoked successfully' })
-  async logout(@Body('refresh_token') refreshToken: string) {
-
+  @ApiResponse({ status: 200, description: 'Tokens revoked successfully and cookies cleared' })
+  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     try {
-      return await this.authService.logout(refreshToken);
+      const refreshToken = req.cookies?.refresh_token;
+      if (refreshToken) {
+        await this.authService.logout(refreshToken);
+      }
+
+      // Clear cookies
+      clearAuthCookies(res);
+
+      return { message: 'Logged out successfully' };
     } catch (error) {
+      // Clear cookies even if there's an error
+      clearAuthCookies(res);
       throw new HttpException(error.message, HttpStatus.UNAUTHORIZED);
     }
   }
@@ -124,14 +148,13 @@ export class AuthController {
       const googleProfile = req.user as any;
       const tokens = await this.authService.handleGoogleAuth(googleProfile);
 
-      // Redirect to frontend with tokens
-      const redirectUrl = process.env.FRONTEND_REDIRECT_URL || 'http://localhost:3000/oauth-callback';
-      const queryParams = new URLSearchParams({
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-      });
+      // Set secure HTTP-only cookies
+      const isProduction = process.env.NODE_ENV === 'production';
+      setAuthCookies(res, tokens.accessToken, tokens.refreshToken, isProduction);
 
-      res.redirect(`${redirectUrl}?${queryParams.toString()}`);
+      // Redirect to frontend with success message
+      const redirectUrl = process.env.FRONTEND_REDIRECT_URL || 'http://localhost:3000/oauth-callback';
+      res.redirect(`${redirectUrl}?success=true`);
     } catch (error) {
       const errorRedirectUrl = process.env.FRONTEND_ERROR_REDIRECT_URL || 'http://localhost:3000/error';
       res.redirect(errorRedirectUrl);
@@ -142,5 +165,22 @@ export class AuthController {
   @UseGuards(AuthGuard('jwt'))
   async getCurrentUser(@Req() req) {
     return this.authService.getCurrentUser(req.user.userId);
+  }
+
+  @Get('test-auth')
+  @ApiOperation({ summary: 'Test authentication middleware' })
+  @ApiResponse({ status: 200, description: 'Authentication status' })
+  async testAuth(@Req() req) {
+    if (req.user) {
+      return {
+        authenticated: true,
+        userId: req.user.userId,
+        message: 'User is authenticated via middleware or JWT guard'
+      };
+    }
+    return {
+      authenticated: false,
+      message: 'User is not authenticated'
+    };
   }
 }
