@@ -20,7 +20,7 @@ enum Role {
 }
 
 model User {
-  id        String  @id @default(cuid())
+  id        String  @id @default(uuid())
   fullName  String?
   firstName String?
   lastName  String?
@@ -30,7 +30,7 @@ model User {
   role      Role    @default(USER)
   provider  String  @default("local")
 
-  userAttempts UserAttempts[]
+  userAttempts UserAttempt[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -39,7 +39,7 @@ model User {
 }
 
 model RefreshToken {
-  id        String   @id @default(cuid())
+  id        String   @id @default(uuid())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
   tokenHash String
@@ -61,7 +61,7 @@ enum ModuleType {
 }
 
 model Module {
-  id          String     @id @default(cuid())
+  id          String     @id @default(uuid())
   slug        String     @unique
   name        String
   description String
@@ -88,7 +88,7 @@ enum LessonType {
 }
 
 model Question {
-  id            String       @id @default(cuid())
+  id            String       @id @default(uuid())
   content       String
   options       String[]
   correctAnswer String
@@ -108,12 +108,12 @@ model Question {
 }
 
 model Quiz {
-  id        String    @id @default(cuid())
+  id        String    @id @default(uuid())
   title     String
   jlptLevel JlptLevel
 
   questions    QuizQuestion[]
-  userAttempts UserAttempts[]
+  userAttempts UserAttempt[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -122,7 +122,7 @@ model Quiz {
 }
 
 model QuizQuestion {
-  id    String @id @default(cuid())
+  id    String @id @default(uuid())
   order Int
 
   quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
@@ -131,7 +131,7 @@ model QuizQuestion {
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
   questionId String
 
-  userAnswers UserAnswers[]
+  userAnswers UserAnswer[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -141,8 +141,8 @@ model QuizQuestion {
   @@index([questionId])
 }
 
-model UserAttempts {
-  id String @id @default(cuid())
+model UserAttempt {
+  id String @id @default(uuid())
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId String
@@ -150,7 +150,7 @@ model UserAttempts {
   quiz   Quiz   @relation(fields: [quizId], references: [id], onDelete: Cascade)
   quizId String
 
-  userAnswers UserAnswers[]
+  userAnswers UserAnswer[]
 
   score     Int
   completed Boolean @default(false)
@@ -162,10 +162,10 @@ model UserAttempts {
   @@index([quizId])
 }
 
-model UserAnswers {
-  id String @id @default(cuid())
+model UserAnswer {
+  id String @id @default(uuid())
 
-  userTestAttempt UserAttempts @relation(fields: [userAttemptId], references: [id], onDelete: Cascade)
+  userTestAttempt UserAttempt @relation(fields: [userAttemptId], references: [id], onDelete: Cascade)
   userAttemptId   String
 
   quizQuestion   QuizQuestion @relation(fields: [quizQuestionId], references: [id], onDelete: Cascade)
