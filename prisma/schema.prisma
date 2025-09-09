@@ -30,7 +30,7 @@ model User {
   role      Role    @default(USER)
   provider  String  @default("local")
 
-  userAttempts userAttempts[]
+  userAttempts UserAttempts[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -113,7 +113,7 @@ model Quiz {
   jlptLevel JlptLevel
 
   questions    QuizQuestion[]
-  userAttempts userAttempts[]
+  userAttempts UserAttempts[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -141,7 +141,7 @@ model QuizQuestion {
   @@index([questionId])
 }
 
-model userAttempts {
+model UserAttempts {
   id String @id @default(cuid())
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -165,7 +165,7 @@ model userAttempts {
 model UserAnswers {
   id String @id @default(cuid())
 
-  userTestAttempt userAttempts @relation(fields: [userAttemptId], references: [id], onDelete: Cascade)
+  userTestAttempt UserAttempts @relation(fields: [userAttemptId], references: [id], onDelete: Cascade)
   userAttemptId   String
 
   quizQuestion   QuizQuestion @relation(fields: [quizQuestionId], references: [id], onDelete: Cascade)
