@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { LessonType, QuestionType } from '@prisma/client';
 import { DatabaseService } from 'src/database/database.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
@@ -22,8 +23,8 @@ export class QuestionsService {
     return this.databaseService.question.findMany({
       where: {
         moduleId: moduleId || undefined,
-        type: type as any || undefined,
-        lessonType: lessonType as any || undefined,
+        type: type as QuestionType || undefined,
+        lessonType: lessonType as LessonType || undefined,
       },
       skip,
       take,

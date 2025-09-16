@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Quiz } from '@prisma/client';
 import { DatabaseService } from 'src/database/database.service';
 import { CreateModuleDto } from './dto/create-module.dto';
 import { UpdateModuleDto } from './dto/update-module.dto';
@@ -37,5 +38,75 @@ export class ModuleService {
       throw new NotFoundException(`Module with id '${id}' not found`);
     }
     return this.databaseService.module.delete({ where: { id } });
+  }
+
+  async getQuizByModule(id: string, numQuestions = 10) {
+    const module = await this.databaseService.module.findUnique({ where: { id } });
+    if (!module) {
+      throw new NotFoundException(`Module with id '${id}' not found`);
+    }
+
+    const moduleQuestions = await this.databaseService.question.findMany({
+      where: { moduleId: id },
+    });
+
+
+    // Shuffle and pick numQuestions random questions
+    const shuffled = moduleQuestions.sort(() => 0.5 - Math.random());
+    const selectedQuestions = shuffled.slice(0, numQuestions);
+
+    const quiz = await this.databaseService.quiz.create({
+      data: {
+        title: `${module.name} Quiz` +
+          (selectedQuestions.length < numQuestions ? ` (${selectedQuestions.length} questions)` : ''),
+        jlptLevel: module.jlptLevel,
+        moduleId: module.id,
+      } as Quiz
+    });
+
+    for (let i = 0; i < selectedQuestions.length; i++) {
+      await this.databaseService.quizQuestion.create({
+        data: {
+          quizId: quiz.id,
+          questionId: selectedQuestions[i].id,
+          order: i + 1,
+        }
+      });
+    }
+
+    const quizWithQuestions = await this.databaseService.quiz.findUnique({
+      where: { id: quiz.id },
+      include: {
+        questions: {
+          orderBy: { order: 'asc' },
+          include: { question: true }
+        }
+      }
+    });
+
+    return {
+      module: {
+        id: module.id,
+        slug: module.slug,
+        name: module.name,
+        jlptLevel: module.jlptLevel,
+        type: module.type,
+      },
+      quiz: {
+        id: quizWithQuestions!.id,
+        title: quizWithQuestions!.title,
+        jlptLevel: quizWithQuestions!.jlptLevel,
+        questionCount: quizWithQuestions!.questions.length,
+        questions: quizWithQuestions!.questions.map((qq) => ({
+          id: qq.question.id,
+          order: qq.order,
+          content: qq.question.content,
+          options: qq.question.options,
+          type: qq.question.type,
+          lessonType: qq.question.lessonType,
+          explanation: qq.question.explanation,
+        })),
+      },
+    };
   }
 }

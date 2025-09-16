@@ -32,8 +32,8 @@ async function main() {
   console.log(`❓ Created ${questions.length} questions`);
 
   // Create quizzes
-  const quizzes = await createQuizzes(questions, modules);
-  console.log(`📝 Created ${quizzes.length} quizzes`);
+  // const quizzes = await createQuizzes(questions, modules);
+  // console.log(`📝 Created ${quizzes.length} quizzes`);
 
   console.log('✅ Database seeding completed successfully!');
 }
@@ -265,7 +265,7 @@ async function createQuizzes(questions: any[], modules: any[]) {
 
   // Get N5 module IDs
   const n5ModuleIds = modules.filter(m => m.jlptLevel === 'N5').map(m => m.id);
-  
+
   // Create N5 quiz
   const n5Questions = questions.filter(q => n5ModuleIds.includes(q.moduleId));
 

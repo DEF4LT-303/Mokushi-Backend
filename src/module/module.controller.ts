@@ -1,7 +1,7 @@
 
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBody, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiBody, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { CreateModuleDto } from './dto/create-module.dto';
 import { UpdateModuleDto } from './dto/update-module.dto';
 import { ModuleService } from './module.service';
@@ -38,6 +38,25 @@ export class ModuleController {
   @ApiNotFoundResponse({ description: 'Module not found' })
   findOne(@Param('id') id: string) {
     return this.moduleService.findOne(id);
+  }
+
+  @Get(':id/quiz')
+  @ApiOperation({ summary: 'Get a quiz for a module with its questions' })
+  @ApiOkResponse({ description: 'Quiz for the module with ordered questions' })
+  @ApiNotFoundResponse({ description: 'Module not found' })
+  @ApiQuery({
+    name: 'numQuestions',
+    required: false,
+    type: Number,
+    description: 'Number of random questions to include in the quiz (default: 10)',
+    example: 10,
+  })
+  getModuleQuiz(
+    @Param('id') id: string,
+    @Query('numQuestions') numQuestions?: string
+  ) {
+    const num = numQuestions ? parseInt(numQuestions, 10) : undefined;
+    return this.moduleService.getQuizByModule(id, num);
   }
 
 
