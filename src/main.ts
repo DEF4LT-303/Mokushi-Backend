@@ -44,6 +44,15 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api/docs', app, document);
 
+  app.getHttpAdapter().get('/', (req, res) => {
+    res.send('Welcome to Mokushi Backend! 🚀');
+  });
+
   await app.listen(process.env.PORT ?? 8000);
+
+  console.log(`🚀 Server is running on http://localhost:${process.env.PORT ?? 8000}/api`);
+  console.log(`📚 Swagger docs available at http://localhost:${process.env.PORT ?? 8000}/api/docs`);
+
+  console.log(`Environment: ${process.env.NODE_ENV ?? 'development'}`);
 }
 bootstrap();
