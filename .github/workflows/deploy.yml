@@ -24,5 +24,5 @@ jobs:
             git reset --hard HEAD
             git pull origin production
             npm install --omit=dev
-            pm2 restart index.js
+            pm2 restart Mokushi-Backend || pm2 start dist/src/main.js --name Mokushi-Backend
             echo "Deployment successful at $(date)" >> deploy.log
