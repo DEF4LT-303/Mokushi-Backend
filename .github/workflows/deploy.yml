@@ -20,7 +20,7 @@ jobs:
           key: ${{ secrets.CPANEL_SSH_KEY }}
           port: 22
           script: |
-            cd /home/your-cpanel-user/api_canigao
+            cd /home/mokushiken/repositories/Mokushi-Backend
             git reset --hard HEAD
             git pull origin production
             npm install --omit=dev
