@@ -46,7 +46,7 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ?? 8000);
 
-  console.log(`🚀 Server is running on http://localhost:${process.env.PORT ?? 8000}/api`);
+  console.log(`🚀 Server is running...`);
 
   console.log(`Environment: ${process.env.NODE_ENV ?? 'development'}`);
 }
