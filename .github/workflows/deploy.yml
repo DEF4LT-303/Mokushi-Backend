@@ -20,7 +20,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            cd /home/mokushiken/repositories/Mokushi-Backend
+            source /home/mokushiken/nodevenv/repositories/Mokushi-Backend/20/bin/activate && cd /home/mokushiken/repositories/Mokushi-Backend
             git reset --hard HEAD
             git pull origin production
             npm install --omit=dev
