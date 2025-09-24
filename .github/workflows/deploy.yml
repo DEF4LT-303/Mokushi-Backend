@@ -32,8 +32,8 @@ jobs:
           server: ${{ secrets.CPANEL_FTP_HOST }}
           username: ${{ secrets.CPANEL_FTP_USER }}
           password: ${{ secrets.CPANEL_FTP_PASSWORD }}
-          server-dir: /home/mokushiken/repositories/Mokushi-Backend/dist/
-          local-dir: ./dist/
+          server-dir: /home/mokushiken/repositories/Mokushi-Backend/
+          local-dir: dist/
           exclude: |
             **/.git*
             **/node_modules/**
@@ -51,5 +51,5 @@ jobs:
           server: ${{ secrets.CPANEL_FTP_HOST }}
           username: ${{ secrets.CPANEL_FTP_USER }}
           password: ${{ secrets.CPANEL_FTP_PASSWORD }}
-          server-dir: /home/mokushiken/repositories/Mokushi-Backend/dist/tmp/
-          local-dir: ./tmp/
+          server-dir: /home/mokushiken/repositories/Mokushi-Backend/tmp/
+          local-dir: tmp/
