@@ -19,7 +19,6 @@ jobs:
 
       - name: Install dependencies and build
         run: |
-          source /home/mokushiken/nodevenv/repositories/Mokushi-Backend/20/bin/activate && cd /home/mokushiken/repositories/Mokushi-Backend
           npm ci --omit=dev
           npm run build
 
