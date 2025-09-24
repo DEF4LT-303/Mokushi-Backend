@@ -101,11 +101,4 @@ export class UsersController {
     }
     return this.usersService.remove(id);
   }
-
-  @Get('test')
-  @ApiOperation({ summary: 'Test endpoint' })
-  @ApiOkResponse({ description: 'Test endpoint is working' })
-  test() {
-    return { message: 'Test endpoint is working' };
-  }
 }
