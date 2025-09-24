@@ -7,7 +7,6 @@ import { AuthMiddleware } from './auth/middleware/auth.middleware';
 import { DatabaseModule } from './database/database.module';
 import { ModuleModule } from './module/module.module';
 import { QuestionsModule } from './questions/questions.module';
-import { TestController } from './test.controller';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -22,7 +21,6 @@ import { UsersModule } from './users/users.module';
       signOptions: { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m' },
     }),
   ],
-  controllers: [TestController],
   providers: [
     {
       provide: APP_GUARD,
