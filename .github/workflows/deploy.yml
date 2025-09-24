@@ -38,3 +38,18 @@ jobs:
             **/.git*
             **/node_modules/**
             **/tests/**
+
+      # --- restart --- #
+      - name: Prepare restart trigger
+        run: |
+          mkdir -p tmp
+          date > tmp/restart.txt
+
+      - name: Upload restart.txt via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.CPANEL_FTP_HOST }}
+          username: ${{ secrets.CPANEL_FTP_USER }}
+          password: ${{ secrets.CPANEL_FTP_PASSWORD }}
+          server-dir: /home/mokushiken/repositories/Mokushi-Backend/tmp/
+          local-dir: ./tmp/
