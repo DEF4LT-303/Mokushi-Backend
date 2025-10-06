@@ -2,14 +2,16 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
+    "removeComments": true,
     "module": "CommonJS",
-    "declaration": true,
-    "sourceMap": true
+    "target": "ES2021",
+    "declaration": false,
+    "sourceMap": false
   },
   "exclude": [
     "node_modules",
+    "test",
     "dist",
-    "**/*.spec.ts",
-    "test"
+    "**/*.spec.ts"
   ]
 }
