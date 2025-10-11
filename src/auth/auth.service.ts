@@ -71,6 +71,7 @@ export class AuthService {
         lastName: user?.lastName,
         fullName: user?.fullName,
         picture: user?.picture,
+        role: user?.role,
       },
     };
   }
