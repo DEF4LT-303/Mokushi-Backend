@@ -1,7 +1,0 @@
----
-deployment:
-  tasks:
-    - export NODE_ENV=production
-    - npm install
-    - npm run build
-    - pm2 restart Mokushi-Backend || pm2 start dist/main.js --name Mokushi-Backend

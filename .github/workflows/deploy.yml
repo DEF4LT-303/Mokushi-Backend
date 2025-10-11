@@ -1,0 +1,55 @@
+name: Deploy to cPanel via FTP
+
+on:
+  push:
+    branches:
+      - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      - name: Install dependencies and build
+        run: npm ci
+
+      - name: Prisma generate
+        run: npx prisma generate
+
+      - name: Build NestJS app
+        run: npx nest build
+
+      - name: Upload files via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.CPANEL_FTP_HOST }}
+          username: ${{ secrets.CPANEL_FTP_USER }}
+          password: ${{ secrets.CPANEL_FTP_PASSWORD }}
+          server-dir: /home/mokushiken/repositories/Mokushi-Backend/
+          local-dir: dist/
+          exclude: |
+            **/.git*
+            **/node_modules/**
+            **/tests/**
+
+      # --- restart --- #
+      - name: Prepare restart trigger
+        run: |
+          mkdir -p tmp
+          date > tmp/restart.txt
+
+      - name: Upload restart.txt via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.CPANEL_FTP_HOST }}
+          username: ${{ secrets.CPANEL_FTP_USER }}
+          password: ${{ secrets.CPANEL_FTP_PASSWORD }}
+          server-dir: /home/mokushiken/repositories/Mokushi-Backend/tmp/
+          local-dir: tmp/
