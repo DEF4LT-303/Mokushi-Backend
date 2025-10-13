@@ -1,8 +1,10 @@
-import { Body, Controller, Delete, Get, HttpException, HttpStatus, Param, Patch, Post, Req, UseGuards, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpException, HttpStatus, Param, Patch, Post, UseGuards, ValidationPipe } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
-import { Request } from 'express';
+import { SafeUser } from 'prisma/safe-user.select';
+import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { isAdmin } from 'src/common/utils/role.helpers';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UsersService } from './users.service';
@@ -56,11 +58,10 @@ export class UsersController {
   async update(
     @Param('id') id: string,
     @Body(ValidationPipe) updateUserDto: UpdateUserDto,
-    @Req() req: Request
+    @CurrentUser() currentUser: SafeUser
   ) {
-    const loggedInUser = req.user as any;
-
-    if (loggedInUser.userId !== id && loggedInUser.role !== 'ADMIN') {
+    // Check if current user is the owner or an admin
+    if (currentUser.id !== id && !isAdmin(currentUser.role)) {
       throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
     }
 
@@ -88,10 +89,9 @@ export class UsersController {
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden' })
   @ApiNotFoundResponse({ description: 'User not found' })
-  async remove(@Param('id') id: string, @Req() req: Request) {
-    const loggedInUser = req.user as any;
-
-    if (loggedInUser.userId !== id && loggedInUser.role !== 'ADMIN') {
+  async remove(@Param('id') id: string, @CurrentUser() currentUser: SafeUser) {
+    // Check if current user is the owner or an admin
+    if (currentUser.id !== id && !isAdmin(currentUser.role)) {
       throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
     }
 

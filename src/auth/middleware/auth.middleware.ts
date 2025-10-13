@@ -1,19 +1,19 @@
 import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { Request, Response, NextFunction } from 'express';
-import { DatabaseService } from 'src/database/database.service';
+import { NextFunction, Request, Response } from 'express';
 import { hashToken } from 'src/common/utils/jwt.helpers';
+import { DatabaseService } from 'src/database/database.service';
 
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
   constructor(
     private readonly jwtService: JwtService,
     private readonly databaseService: DatabaseService,
-  ) {}
+  ) { }
 
   async use(req: Request, res: Response, next: NextFunction) {
     const accessToken = req.cookies?.access_token;
-    
+
     if (!accessToken) {
       return next();
     }
@@ -23,14 +23,14 @@ export class AuthMiddleware implements NestMiddleware {
       const payload = this.jwtService.verify(accessToken, {
         secret: process.env.JWT_ACCESS_SECRET,
       });
-      
-      // Token is valid, continue
+
+      // Token is valid
       req.user = { userId: payload.sub };
       return next();
     } catch (error) {
       // Access token is expired or invalid, try to refresh
       const refreshToken = req.cookies?.refresh_token;
-      
+
       if (!refreshToken) {
         // No refresh token, clear cookies and continue
         res.clearCookie('access_token', { path: '/' });
@@ -79,7 +79,7 @@ export class AuthMiddleware implements NestMiddleware {
           path: '/',
         });
 
-        // Set user in request and continue
+        // Set user in request and continue - JWT strategy will handle user data
         req.user = { userId };
         return next();
       } catch (refreshError) {
