@@ -164,7 +164,7 @@ export class AuthController {
   @Get('me')
   @UseGuards(AuthGuard('jwt'))
   async getCurrentUser(@Req() req) {
-    return this.authService.getCurrentUser(req.user.userId);
+    return this.authService.getCurrentUser(req.user.id);
   }
 
   @Get('test-auth')
@@ -174,7 +174,7 @@ export class AuthController {
     if (req.user) {
       return {
         authenticated: true,
-        userId: req.user.userId,
+        userId: req.user.id,
         message: 'User is authenticated via middleware or JWT guard'
       };
     }
