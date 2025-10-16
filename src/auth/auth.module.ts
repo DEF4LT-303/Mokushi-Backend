@@ -6,6 +6,7 @@ import { UsersModule } from 'src/users/users.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AdminGuard } from './guards/admin.guard';
+import { RolesGuard } from './guards/roles.guard';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { localStrategy } from './strategies/local.strategy';
@@ -21,7 +22,7 @@ import { localStrategy } from './strategies/local.strategy';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, localStrategy, JwtStrategy, GoogleStrategy, AdminGuard],
-  exports: [AdminGuard],
+  providers: [AuthService, localStrategy, JwtStrategy, GoogleStrategy, AdminGuard, RolesGuard],
+  exports: [AdminGuard, RolesGuard],
 })
 export class AuthModule { }
