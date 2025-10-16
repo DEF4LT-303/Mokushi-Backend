@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpException, HttpStatus, Post, Req, Res, UseGuards, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpException, HttpStatus, Post, Req, Res, UseGuards, ValidationPipe } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBody, ApiConflictResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -21,6 +21,7 @@ export class AuthController {
 
   @Post('login')
   @UseGuards(LocalGuard)
+  @HttpCode(200)
   @ApiOperation({ summary: 'Login user and return JWT token in cookies' })
   @ApiBody({
     schema: {
@@ -31,7 +32,7 @@ export class AuthController {
       },
     },
   })
-  @ApiResponse({ status: 201, description: 'User logged in successfully with cookies set' })
+  @ApiResponse({ status: 200, description: 'User logged in successfully with cookies set' })
   @ApiResponse({ status: 401, description: 'Invalid credentials' })
   async login(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.generateTokensAndSave((req.user as any).id);
