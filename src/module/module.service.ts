@@ -102,6 +102,7 @@ export class ModuleService {
           order: qq.order,
           content: qq.question.content,
           options: qq.question.options,
+          correctAnswer: qq.question.correctAnswer,
           type: qq.question.type,
           lessonType: qq.question.lessonType,
           explanation: qq.question.explanation,
