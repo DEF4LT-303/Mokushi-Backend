@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, ValidationPipe } from '@nestjs/common';
-import { ApiBody, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 import { JwtGuard } from 'src/auth/guards/jwt.guard';
@@ -16,6 +16,7 @@ export class QuestionsController {
   @Post()
   @UseGuards(JwtGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Create a new question' })
   @ApiCreatedResponse({ description: 'Question created successfully' })
   @ApiBody({ type: CreateQuestionDto })
@@ -60,6 +61,7 @@ export class QuestionsController {
   @Patch(':id')
   @UseGuards(JwtGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Update a question by ID' })
   @ApiOkResponse({ description: 'Question updated successfully' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
@@ -72,6 +74,7 @@ export class QuestionsController {
   @Delete(':id')
   @UseGuards(JwtGuard, RolesGuard)
   @Roles(Role.ADMIN)
+  @ApiBearerAuth()
   @ApiOperation({ summary: 'Delete a question by ID' })
   @ApiOkResponse({ description: 'Question deleted successfully' })
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
