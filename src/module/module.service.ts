@@ -89,6 +89,7 @@ export class ModuleService {
         id: module.id,
         slug: module.slug,
         name: module.name,
+        description: module.description,
         jlptLevel: module.jlptLevel,
         type: module.type,
       },
