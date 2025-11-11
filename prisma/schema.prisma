@@ -56,20 +56,24 @@ enum JlptLevel {
   N5
 }
 
-enum ModuleType {
-  READING
+enum CategoryType {
+  GRAMMAR
+  VOCABULARY
   LISTENING
 }
 
 model Module {
-  id          String     @id @default(uuid())
-  slug        String     @unique
-  name        String
-  description String
-  jlptLevel   JlptLevel
-  type        ModuleType
-  questions   Question[]
-  quizzes     Quiz[]
+  id                 String       @id @default(uuid())
+  slug               String       @unique
+  name               String
+  description        String
+  learningObjectives Json
+  motivationalQuote  String
+  instructions       Json
+  jlptLevel          JlptLevel
+  categoryType       CategoryType
+  questions          Question[]
+  quizzes            Quiz[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -78,15 +82,9 @@ model Module {
 }
 
 enum QuestionType {
-  MULTIPLE_CHOICE
-  TRUE_FALSE
-  FILL_IN_THE_BLANK
-}
-
-enum LessonType {
-  Grammar
-  Vocabulary
-  Kanji
+  GRAMMAR
+  VOCABULARY
+  KANJI
 }
 
 model Question {
@@ -95,8 +93,7 @@ model Question {
   options       Json
   correctAnswer String
   explanation   String?
-  type          QuestionType
-  lessonType    LessonType
+  questionType  QuestionType
 
   module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   moduleId String

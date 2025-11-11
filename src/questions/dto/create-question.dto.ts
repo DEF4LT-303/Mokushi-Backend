@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { LessonType, QuestionType } from '@prisma/client';
+import { QuestionType } from '@prisma/client';
 import { IsArray, IsEnum, IsNotEmpty, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
 
 export class CreateQuestionDto {
@@ -31,13 +31,7 @@ export class CreateQuestionDto {
 
   @ApiProperty({ enum: QuestionType, description: 'Type of the question' })
   @IsEnum(QuestionType)
-  type: QuestionType;
-
-
-  @ApiProperty({ enum: LessonType, description: 'Lesson type associated with the question' })
-  @IsEnum(LessonType)
-  lessonType: LessonType;
-
+  questionType: QuestionType;
 
   @ApiProperty({ description: 'UUID of the module this question belongs to.' })
   @IsUUID()

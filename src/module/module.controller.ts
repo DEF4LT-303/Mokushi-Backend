@@ -30,10 +30,24 @@ export class ModuleController {
 
 
   @Get()
-  @ApiOperation({ summary: 'Get all modules' })
-  @ApiOkResponse({ description: 'List of modules' })
-  findAll() {
-    return this.moduleService.findAll();
+  @ApiOperation({ summary: 'Get modules with optional filters' })
+  @ApiOkResponse({ description: 'List of modules with total count' })
+  @ApiQuery({ name: 'jlptLevel', required: false, enum: ['N4', 'N5'] })
+  @ApiQuery({ name: 'categoryType', required: false, enum: ['GRAMMAR', 'VOCABULARY', 'LISTENING'] })
+  @ApiQuery({ name: 'skip', required: false })
+  @ApiQuery({ name: 'take', required: false })
+  findMany(
+    @Query('jlptLevel') jlptLevel?: string,
+    @Query('categoryType') categoryType?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.moduleService.findMany({
+      jlptLevel,
+      categoryType,
+      skip: skip ? Number(skip) : undefined,
+      take: take ? Number(take) : undefined,
+    });
   }
 
 

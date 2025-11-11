@@ -1,7 +1,7 @@
 
 import { ApiProperty } from '@nestjs/swagger';
-import { JlptLevel, ModuleType } from '@prisma/client';
-import { IsEnum, IsString } from 'class-validator';
+import { CategoryType, JlptLevel } from '@prisma/client';
+import { IsArray, IsEnum, IsString } from 'class-validator';
 
 export class CreateModuleDto {
   @ApiProperty({ description: 'Unique slug for the module' })
@@ -16,11 +16,25 @@ export class CreateModuleDto {
   @IsString()
   description: string;
 
+  @ApiProperty({ description: 'Learning objectives for the module' })
+  @IsArray()
+  @IsString({ each: true })
+  learningObjectives: string[];
+
+  @ApiProperty({ description: 'Instructions for the module' })
+  @IsArray()
+  @IsString({ each: true })
+  instructions: string[];
+
+  @ApiProperty({ description: 'Motivational quote' })
+  @IsString()
+  motivationalQuote: string;
+
   @ApiProperty({ enum: JlptLevel, description: 'JLPT level for the module' })
   @IsEnum(JlptLevel)
   jlptLevel: JlptLevel;
 
-  @ApiProperty({ enum: ModuleType, description: 'Type of the module' })
-  @IsEnum(ModuleType)
-  type: ModuleType;
+  @ApiProperty({ enum: CategoryType, description: 'Type of the module' })
+  @IsEnum(CategoryType)
+  categoryType: CategoryType;
 }
