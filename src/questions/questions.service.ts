@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { LessonType, QuestionType } from '@prisma/client';
+import { QuestionType } from '@prisma/client';
 import { DatabaseService } from 'src/database/database.service';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
@@ -12,24 +12,32 @@ export class QuestionsService {
     return this.databaseService.question.create({ data: createQuestionDto });
   }
 
-  findMany(params: {
+  async findMany(params: {
     moduleId?: string;
-    type?: string;
-    lessonType?: string;
+    questionType?: string;
     skip?: number;
     take?: number;
   }) {
-    const { moduleId, type, lessonType, skip, take } = params;
-    return this.databaseService.question.findMany({
-      where: {
-        moduleId: moduleId || undefined,
-        type: type as QuestionType || undefined,
-        lessonType: lessonType as LessonType || undefined,
-      },
-      skip,
-      take,
-      orderBy: { createdAt: 'desc' }
-    });
+    const { moduleId, questionType, skip, take } = params;
+    const where = {
+      moduleId: moduleId || undefined,
+      questionType: questionType as QuestionType || undefined,
+    };
+
+    const [questions, count] = await Promise.all([
+      this.databaseService.question.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' }
+      }),
+      this.databaseService.question.count({ where })
+    ]);
+
+    return {
+      count,
+      data: questions,
+    };
   }
 
   async findOne(id: string) {
@@ -54,6 +62,17 @@ export class QuestionsService {
       throw new NotFoundException(`Question with id '${id}' not found`);
     }
     return this.databaseService.question.delete({ where: { id } });
+  }
+
+  async removeByModule(moduleId: string) {
+    const module = await this.databaseService.module.findUnique({ where: { id: moduleId } });
+    if (!module) {
+      throw new NotFoundException(`Module with id '${moduleId}' not found`);
+    }
+
+    const totalCount = await this.databaseService.question.count({ where: { moduleId } });
+    const result = await this.databaseService.question.deleteMany({ where: { moduleId } });
+    return { deletedCount: result.count, totalCount };
   }
 }
 

@@ -28,23 +28,20 @@ export class QuestionsController {
 
   @Get()
   @ApiOperation({ summary: 'Get questions with optional filters' })
-  @ApiOkResponse({ description: 'List of questions' })
+  @ApiOkResponse({ description: 'List of questions with total count' })
   @ApiQuery({ name: 'moduleId', required: false })
-  @ApiQuery({ name: 'type', required: false, enum: ['MULTIPLE_CHOICE', 'TRUE_FALSE', 'FILL_IN_THE_BLANK'] })
-  @ApiQuery({ name: 'lessonType', required: false, enum: ['Grammar', 'Vocabulary', 'Kanji'] })
+  @ApiQuery({ name: 'questionType', required: false, enum: ['GRAMMAR', 'VOCABULARY', 'KANJI'] })
   @ApiQuery({ name: 'skip', required: false })
   @ApiQuery({ name: 'take', required: false })
   findMany(
     @Query('moduleId') moduleId?: string,
-    @Query('type') type?: string,
-    @Query('lessonType') lessonType?: string,
+    @Query('questionType') questionType?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
   ) {
     return this.questionsService.findMany({
       moduleId,
-      type,
-      lessonType,
+      questionType,
       skip: skip ? Number(skip) : undefined,
       take: take ? Number(take) : undefined,
     });
@@ -82,6 +79,19 @@ export class QuestionsController {
   @ApiNotFoundResponse({ description: 'Question not found' })
   remove(@Param('id') id: string) {
     return this.questionsService.remove(id);
+  }
+
+  @Delete('module/:moduleId')
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Delete all questions by module ID' })
+  @ApiOkResponse({ description: 'Questions deleted successfully (returns deleted count)' })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden' })
+  @ApiNotFoundResponse({ description: 'Module not found' })
+  deleteByModule(@Param('moduleId') moduleId: string) {
+    return this.questionsService.removeByModule(moduleId);
   }
 }
 
