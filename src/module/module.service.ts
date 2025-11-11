@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Quiz } from '@prisma/client';
+import { CategoryType, JlptLevel, Quiz } from '@prisma/client';
 import { DatabaseService } from 'src/database/database.service';
 import { CreateModuleDto } from './dto/create-module.dto';
 import { UpdateModuleDto } from './dto/update-module.dto';
@@ -12,8 +12,32 @@ export class ModuleService {
     return this.databaseService.module.create({ data: createModuleDto });
   }
 
-  findAll() {
-    return this.databaseService.module.findMany();
+  async findMany(params: {
+    jlptLevel?: string;
+    categoryType?: string;
+    skip?: number;
+    take?: number;
+  }) {
+    const { jlptLevel, categoryType, skip, take } = params;
+    const where = {
+      jlptLevel: jlptLevel as JlptLevel || undefined,
+      categoryType: categoryType as CategoryType || undefined,
+    };
+
+    const [modules, count] = await Promise.all([
+      this.databaseService.module.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' }
+      }),
+      this.databaseService.module.count({ where })
+    ]);
+
+    return {
+      count,
+      data: modules,
+    };
   }
 
   async findOne(id: string) {
@@ -91,7 +115,7 @@ export class ModuleService {
         name: module.name,
         description: module.description,
         jlptLevel: module.jlptLevel,
-        type: module.type,
+        categoryType: module.categoryType,
       },
       quiz: {
         id: quizWithQuestions!.id,
@@ -104,8 +128,7 @@ export class ModuleService {
           content: qq.question.content,
           options: qq.question.options,
           correctAnswer: qq.question.correctAnswer,
-          type: qq.question.type,
-          lessonType: qq.question.lessonType,
+          questionType: qq.question.questionType,
           explanation: qq.question.explanation,
         })),
       },

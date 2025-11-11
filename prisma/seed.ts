@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { JlptLevel, LessonType, ModuleType, PrismaClient, QuestionType, Role } from '@prisma/client';
+import { JlptLevel, CategoryType, PrismaClient, QuestionType, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -91,28 +91,110 @@ async function createModules() {
       name: 'Hiragana Reading Practice',
       description: 'Basic hiragana reading exercises for JLPT N5 level',
       jlptLevel: JlptLevel.N5,
-      type: ModuleType.READING,
+      categoryType: CategoryType.VOCABULARY,
+      learningObjectives: [
+        'Master basic hiragana characters',
+        'Read simple hiragana words',
+        'Understand hiragana pronunciation'
+      ],
+      motivationalQuote: 'Every expert was once a beginner. Start your journey with hiragana!',
+      instructions: {
+        steps: [
+          'Read each hiragana character carefully',
+          'Practice pronunciation',
+          'Complete the exercises'
+        ],
+        duration: '15 minutes',
+        difficulty: 'Beginner'
+      },
     },
     {
       slug: 'n5-katakana-reading',
       name: 'Katakana Reading Practice',
       description: 'Basic katakana reading exercises for JLPT N5 level',
       jlptLevel: JlptLevel.N5,
-      type: ModuleType.READING,
+      categoryType: CategoryType.VOCABULARY,
+      learningObjectives: [
+        'Master basic katakana characters',
+        'Read simple katakana words',
+        'Understand katakana pronunciation'
+      ],
+      motivationalQuote: 'Katakana opens the door to foreign words in Japanese!',
+      instructions: {
+        steps: [
+          'Read each katakana character carefully',
+          'Practice pronunciation',
+          'Complete the exercises'
+        ],
+        duration: '15 minutes',
+        difficulty: 'Beginner'
+      },
     },
     {
       slug: 'n5-basic-vocabulary',
       name: 'Basic Vocabulary',
       description: 'Essential vocabulary words for JLPT N5 level',
       jlptLevel: JlptLevel.N5,
-      type: ModuleType.READING,
+      categoryType: CategoryType.VOCABULARY,
+      learningObjectives: [
+        'Learn essential N5 vocabulary',
+        'Understand word meanings',
+        'Practice word usage'
+      ],
+      motivationalQuote: 'Vocabulary is the foundation of language learning!',
+      instructions: {
+        steps: [
+          'Study each vocabulary word',
+          'Learn the meaning and usage',
+          'Complete practice questions'
+        ],
+        duration: '20 minutes',
+        difficulty: 'Beginner'
+      },
     },
     {
       slug: 'n5-listening-basics',
       name: 'Basic Listening Comprehension',
       description: 'Simple listening exercises for JLPT N5 level',
       jlptLevel: JlptLevel.N5,
-      type: ModuleType.LISTENING,
+      categoryType: CategoryType.LISTENING,
+      learningObjectives: [
+        'Improve listening comprehension',
+        'Recognize basic Japanese sounds',
+        'Understand simple conversations'
+      ],
+      motivationalQuote: 'Listening is the key to real communication!',
+      instructions: {
+        steps: [
+          'Listen to the audio carefully',
+          'Answer comprehension questions',
+          'Review your answers'
+        ],
+        duration: '25 minutes',
+        difficulty: 'Beginner'
+      },
+    },
+    {
+      slug: 'n5-basic-kanji',
+      name: 'Basic Kanji Practice',
+      description: 'Essential kanji characters for JLPT N5 level',
+      jlptLevel: JlptLevel.N5,
+      categoryType: CategoryType.VOCABULARY,
+      learningObjectives: [
+        'Learn basic kanji characters',
+        'Understand kanji readings',
+        'Practice kanji recognition'
+      ],
+      motivationalQuote: 'Kanji is the heart of written Japanese!',
+      instructions: {
+        steps: [
+          'Study each kanji character',
+          'Learn both on-yomi and kun-yomi readings',
+          'Complete practice questions'
+        ],
+        duration: '20 minutes',
+        difficulty: 'Beginner'
+      },
     },
   ];
 
@@ -152,31 +234,46 @@ async function createQuestions(modules: any[]) {
 
 function generateQuestionData(module: any) {
   const questionTypes = Object.values(QuestionType);
-  const lessonTypes = Object.values(LessonType);
 
-  const questionType = faker.helpers.arrayElement(questionTypes);
-  const lessonType = faker.helpers.arrayElement(lessonTypes);
+  // Map module categoryType to questionType
+  let questionType: QuestionType;
+  if (module.categoryType === CategoryType.GRAMMAR) {
+    questionType = QuestionType.GRAMMAR;
+  } else if (module.categoryType === CategoryType.VOCABULARY) {
+    // For kanji modules, always generate KANJI questions
+    // For other vocabulary modules, sometimes generate KANJI questions (30% chance)
+    if (module.slug.includes('kanji')) {
+      questionType = QuestionType.KANJI;
+    } else {
+      questionType = faker.helpers.arrayElement([
+        QuestionType.VOCABULARY,
+        QuestionType.VOCABULARY,
+        QuestionType.VOCABULARY,
+        QuestionType.KANJI, // 25% chance for KANJI
+      ]);
+    }
+  } else {
+    // For LISTENING, use VOCABULARY as default
+    questionType = faker.helpers.arrayElement([QuestionType.VOCABULARY, QuestionType.GRAMMAR]);
+  }
 
-  // Generate content based on module type and JLPT level
-  const content = generateQuestionContent(module, questionType, lessonType);
+  // Generate content based on module categoryType and questionType
+  const content = generateQuestionContent(module, questionType);
   const options = generateQuestionOptions(questionType, content);
   const correctAnswer = faker.helpers.arrayElement(options);
-  const explanation = generateExplanation(lessonType);
+  const explanation = generateExplanation(questionType);
 
   return {
     content,
     options,
     correctAnswer,
     explanation,
-    type: questionType,
-    lessonType,
+    questionType,
   };
 }
 
-function generateQuestionContent(module: any, questionType: QuestionType, lessonType: LessonType) {
-  const isReading = module.type === 'READING';
-
-  if (lessonType === LessonType.Grammar) {
+function generateQuestionContent(module: any, questionType: QuestionType) {
+  if (questionType === QuestionType.GRAMMAR) {
     const patterns = [
       'これは___です。',
       '___は___です。',
@@ -185,11 +282,11 @@ function generateQuestionContent(module: any, questionType: QuestionType, lesson
       '___は___が好きです。',
     ];
     return faker.helpers.arrayElement(patterns);
-  } else if (lessonType === LessonType.Vocabulary) {
+  } else if (questionType === QuestionType.VOCABULARY) {
     const words = ['食べ物', '飲み物', '家族', '学校', '家', '車', '本', '友達'];
     const word = faker.helpers.arrayElement(words);
     return `「${word}」の意味は何ですか？`;
-  } else if (lessonType === LessonType.Kanji) {
+  } else if (questionType === QuestionType.KANJI) {
     const kanji = ['人', '大', '小', '山', '川', '田', '木', '火'];
     const kanjiChar = faker.helpers.arrayElement(kanji);
     return `「${kanjiChar}」の読み方は何ですか？`;
@@ -199,18 +296,15 @@ function generateQuestionContent(module: any, questionType: QuestionType, lesson
 }
 
 function generateQuestionOptions(questionType: QuestionType, content: string) {
-  if (questionType === QuestionType.TRUE_FALSE) {
-    return ['正しい', '間違い'];
-  }
-
-  if (questionType === QuestionType.FILL_IN_THE_BLANK) {
+  // For grammar questions, provide particle options
+  if (questionType === QuestionType.GRAMMAR) {
     const options = [
       'は', 'が', 'を', 'に', 'で', 'と', 'から', 'まで'
     ];
     return faker.helpers.arrayElements(options, 4);
   }
 
-  // Multiple choice
+  // For vocabulary and kanji questions, provide multiple choice options
   const correctOptions = generateCorrectOptions(content);
   const wrongOptions = generateWrongOptions(content);
 
@@ -219,18 +313,39 @@ function generateQuestionOptions(questionType: QuestionType, content: string) {
 }
 
 function generateCorrectOptions(content: string) {
+  // Vocabulary word meanings
   if (content.includes('食べ物')) return ['food'];
   if (content.includes('飲み物')) return ['drink'];
   if (content.includes('家族')) return ['family'];
   if (content.includes('学校')) return ['school'];
+  
+  // Kanji readings
   if (content.includes('人')) return ['ひと', 'じん'];
   if (content.includes('大')) return ['おお', 'だい'];
   if (content.includes('小')) return ['ちい', 'しょう'];
+  if (content.includes('山')) return ['やま', 'さん'];
+  if (content.includes('川')) return ['かわ', 'せん'];
+  if (content.includes('田')) return ['た', 'でん'];
+  if (content.includes('木')) return ['き', 'もく'];
+  if (content.includes('火')) return ['ひ', 'か'];
 
   return ['正解1', '正解2'];
 }
 
 function generateWrongOptions(content: string) {
+  // If it's a kanji question, provide realistic wrong readings
+  if (content.includes('人') || content.includes('大') || content.includes('小') || 
+      content.includes('山') || content.includes('川') || content.includes('田') || 
+      content.includes('木') || content.includes('火')) {
+    const wrongKanjiReadings = [
+      'あか', 'あお', 'しろ', 'くろ', 'みどり',
+      'みず', 'つち', 'かぜ', 'そら', 'ほし',
+      'つき', 'たいよう', 'はな', 'き', 'いえ'
+    ];
+    return faker.helpers.arrayElements(wrongKanjiReadings, 3);
+  }
+  
+  // For vocabulary questions, use generic wrong options
   const wrongOptions = [
     'wrong1', 'wrong2', 'wrong3', 'wrong4', 'wrong5',
     '間違い1', '間違い2', '間違い3', '間違い4'
@@ -238,26 +353,26 @@ function generateWrongOptions(content: string) {
   return faker.helpers.arrayElements(wrongOptions, 3);
 }
 
-function generateExplanation(lessonType: LessonType) {
+function generateExplanation(questionType: QuestionType) {
   const explanations = {
-    [LessonType.Grammar]: [
+    [QuestionType.GRAMMAR]: [
       'この文法は基本的な文型です。',
       'この表現は日常会話でよく使われます。',
       'この文法は丁寧語の形です。',
     ],
-    [LessonType.Vocabulary]: [
+    [QuestionType.VOCABULARY]: [
       'この単語は基本的な語彙です。',
       'この言葉は漢字で書くことができます。',
       'この語彙はJLPTでよく出題されます。',
     ],
-    [LessonType.Kanji]: [
+    [QuestionType.KANJI]: [
       'この漢字は音読みと訓読みがあります。',
       'この漢字は部首から成り立っています。',
       'この漢字は複数の読み方があります。',
     ],
   };
 
-  return faker.helpers.arrayElement(explanations[lessonType]);
+  return faker.helpers.arrayElement(explanations[questionType]);
 }
 
 async function createQuizzes(questions: any[], modules: any[]) {
