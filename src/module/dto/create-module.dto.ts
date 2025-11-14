@@ -1,7 +1,7 @@
 
 import { ApiProperty } from '@nestjs/swagger';
 import { CategoryType, JlptLevel } from '@prisma/client';
-import { IsArray, IsEnum, IsString } from 'class-validator';
+import { IsArray, IsEnum, IsObject, IsString } from 'class-validator';
 
 export class CreateModuleDto {
   @ApiProperty({ description: 'Unique slug for the module' })
@@ -22,9 +22,8 @@ export class CreateModuleDto {
   learningObjectives: string[];
 
   @ApiProperty({ description: 'Instructions for the module' })
-  @IsArray()
-  @IsString({ each: true })
-  instructions: string[];
+  @IsObject()
+  instructions: Record<string, any>;
 
   @ApiProperty({ description: 'Motivational quote' })
   @IsString()
