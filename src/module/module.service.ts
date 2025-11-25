@@ -123,11 +123,11 @@ export class ModuleService {
         jlptLevel: quizWithQuestions!.jlptLevel,
         questionCount: quizWithQuestions!.questions.length,
         questions: quizWithQuestions!.questions.map((qq) => ({
-          id: qq.question.id,
+          quizQuestionId: qq.id,
+          questionId: qq.question.id,
           order: qq.order,
           content: qq.question.content,
           options: qq.question.options,
-          correctAnswer: qq.question.correctAnswer,
           questionType: qq.question.questionType,
           explanation: qq.question.explanation,
         })),
