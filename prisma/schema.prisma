@@ -74,6 +74,7 @@ model Module {
   categoryType       CategoryType
   questions          Question[]
   quizzes            Quiz[]
+  quizConfigs        QuizConfig[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -106,6 +107,23 @@ model Question {
   @@index([moduleId])
 }
 
+model QuizConfig {
+  id           String @id @default(uuid())
+  name         String
+  numQuestions Int
+  durationSec  Int
+
+  module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  moduleId String
+
+  quizzes Quiz[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([moduleId])
+}
+
 model Quiz {
   id        String    @id @default(uuid())
   title     String
@@ -115,6 +133,10 @@ model Quiz {
   module   Module? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   moduleId String?
 
+  // Reference to QuizConfig for timing and question count
+  quizConfig   QuizConfig? @relation(fields: [quizConfigId], references: [id], onDelete: SetNull)
+  quizConfigId String?
+
   questions    QuizQuestion[]
   userAttempts UserAttempt[]
 
@@ -123,6 +145,7 @@ model Quiz {
 
   @@index([id])
   @@index([moduleId])
+  @@index([quizConfigId])
 }
 
 model QuizQuestion {
@@ -156,14 +179,17 @@ model UserAttempt {
 
   userAnswers UserAnswer[]
 
-  score     Int
-  completed Boolean @default(false)
+  score       Int
+  completed   Boolean   @default(false)
+  startedAt   DateTime  @default(now()) // When user started the quiz session
+  submittedAt DateTime? // When user submitted (null if not submitted yet)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([quizId])
+  @@index([startedAt])
 }
 
 model UserAnswer {

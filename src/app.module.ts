@@ -8,6 +8,7 @@ import { DatabaseModule } from './database/database.module';
 import { ModuleModule } from './module/module.module';
 import { QuestionsModule } from './questions/questions.module';
 import { UsersModule } from './users/users.module';
+import { UserAttemptsModule } from './user-attempts/user-attempts.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     ModuleModule,
     QuestionsModule,
+    UserAttemptsModule,
     JwtModule.register({
       secret: process.env.JWT_ACCESS_SECRET,
       signOptions: { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m' },

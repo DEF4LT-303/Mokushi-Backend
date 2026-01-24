@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { CategoryType, JlptLevel, Quiz } from '@prisma/client';
+import { CategoryType, JlptLevel } from '@prisma/client';
 import { DatabaseService } from 'src/database/database.service';
 import { CreateModuleDto } from './dto/create-module.dto';
 import { UpdateModuleDto } from './dto/update-module.dto';
@@ -9,7 +9,28 @@ export class ModuleService {
   constructor(private readonly databaseService: DatabaseService) { }
 
   async create(createModuleDto: CreateModuleDto) {
-    return this.databaseService.module.create({ data: createModuleDto });
+    const { quizConfigs, ...moduleData } = createModuleDto;
+
+    // Create module first
+    const module = await this.databaseService.module.create({
+      data: moduleData
+    });
+
+    // Create quiz configs if provided
+    if (quizConfigs && quizConfigs.length > 0) {
+      await this.databaseService.quizConfig.createMany({
+        data: quizConfigs.map(config => ({
+          ...config,
+          moduleId: module.id,
+        })),
+      });
+    }
+
+    // Return module with quiz configs
+    return this.databaseService.module.findUnique({
+      where: { id: module.id },
+      include: { quizConfigs: true },
+    });
   }
 
   async findMany(params: {
@@ -29,7 +50,8 @@ export class ModuleService {
         where,
         skip,
         take,
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        include: { quizConfigs: true },
       }),
       this.databaseService.module.count({ where })
     ]);
@@ -41,7 +63,10 @@ export class ModuleService {
   }
 
   async findOne(id: string) {
-    const module = await this.databaseService.module.findUnique({ where: { id } });
+    const module = await this.databaseService.module.findUnique({
+      where: { id },
+      include: { quizConfigs: true },
+    });
     if (!module) {
       throw new NotFoundException(`Module with id '${id}' not found`);
     }
@@ -53,7 +78,30 @@ export class ModuleService {
     if (!existing) {
       throw new NotFoundException(`Module with id '${id}' not found`);
     }
-    return this.databaseService.module.update({ where: { id }, data: updateModuleDto });
+
+    const { quizConfigs, ...moduleData } = updateModuleDto;
+
+    // Update module fields
+    const updatedModule = await this.databaseService.module.update({
+      where: { id },
+      data: moduleData
+    });
+
+    // Add new quiz configs if provided
+    if (quizConfigs && quizConfigs.length > 0) {
+      await this.databaseService.quizConfig.createMany({
+        data: quizConfigs.map(config => ({
+          ...config,
+          moduleId: id,
+        })),
+      });
+    }
+
+    // Return module with quiz configs
+    return this.databaseService.module.findUnique({
+      where: { id },
+      include: { quizConfigs: true },
+    });
   }
 
   async remove(id: string) {
@@ -64,28 +112,52 @@ export class ModuleService {
     return this.databaseService.module.delete({ where: { id } });
   }
 
-  async getQuizByModule(id: string, numQuestions = 10) {
+  async getQuizConfigsByModule(moduleId: string) {
+    return this.databaseService.quizConfig.findMany({
+      where: { moduleId },
+      orderBy: { numQuestions: 'asc' },
+    });
+  }
+
+  async createQuizConfig(moduleId: string, config: { name: string; numQuestions: number; durationSec: number }) {
+    return this.databaseService.quizConfig.create({
+      data: {
+        ...config,
+        moduleId,
+      },
+    });
+  }
+
+  async getQuizByModule(id: string, quizConfigId: string) {
     const module = await this.databaseService.module.findUnique({ where: { id } });
     if (!module) {
       throw new NotFoundException(`Module with id '${id}' not found`);
+    }
+
+    // Fetch the quiz configuration
+    const quizConfig = await this.databaseService.quizConfig.findUnique({
+      where: { id: quizConfigId },
+    });
+
+    if (!quizConfig || quizConfig.moduleId !== id) {
+      throw new NotFoundException(`Quiz config with id '${quizConfigId}' not found for this module`);
     }
 
     const moduleQuestions = await this.databaseService.question.findMany({
       where: { moduleId: id },
     });
 
-
-    // Shuffle and pick numQuestions random questions
+    // Shuffle and pick numQuestions random questions based on config
     const shuffled = moduleQuestions.sort(() => 0.5 - Math.random());
-    const selectedQuestions = shuffled.slice(0, numQuestions);
+    const selectedQuestions = shuffled.slice(0, quizConfig.numQuestions);
 
     const quiz = await this.databaseService.quiz.create({
       data: {
-        title: `${module.name} Quiz` +
-          (selectedQuestions.length < numQuestions ? ` (${selectedQuestions.length} questions)` : ''),
+        title: `${module.name} Quiz - ${quizConfig.name}`,
         jlptLevel: module.jlptLevel,
         moduleId: module.id,
-      } as Quiz
+        quizConfigId: quizConfig.id,
+      }
     });
 
     for (let i = 0; i < selectedQuestions.length; i++) {
@@ -104,7 +176,8 @@ export class ModuleService {
         questions: {
           orderBy: { order: 'asc' },
           include: { question: true }
-        }
+        },
+        quizConfig: true,
       }
     });
 
@@ -122,14 +195,20 @@ export class ModuleService {
         title: quizWithQuestions!.title,
         jlptLevel: quizWithQuestions!.jlptLevel,
         questionCount: quizWithQuestions!.questions.length,
+        durationSec: quizConfig.durationSec,
+        quizConfig: {
+          id: quizConfig.id,
+          name: quizConfig.name,
+          numQuestions: quizConfig.numQuestions,
+          durationSec: quizConfig.durationSec,
+        },
         questions: quizWithQuestions!.questions.map((qq) => ({
-          id: qq.question.id,
+          quizQuestionId: qq.id,
+          questionId: qq.question.id,
           order: qq.order,
           content: qq.question.content,
           options: qq.question.options,
-          correctAnswer: qq.question.correctAnswer,
           questionType: qq.question.questionType,
-          explanation: qq.question.explanation,
         })),
       },
     };

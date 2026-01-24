@@ -1,18 +1,26 @@
 
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, ValidationPipe } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { Role } from '@prisma/client';
+import { Roles } from 'src/auth/decorators/roles.decorator';
 import { JwtGuard } from 'src/auth/guards/jwt.guard';
 import { RolesGuard } from 'src/auth/guards/roles.guard';
-import { Roles } from 'src/auth/decorators/roles.decorator';
-import { Role } from '@prisma/client';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { SubmitQuizDto } from '../user-attempts/dto/submit-quiz.dto';
+import { UserAttemptsService } from '../user-attempts/user-attempts.service';
 import { CreateModuleDto } from './dto/create-module.dto';
+import { CreateQuizConfigDto } from './dto/create-quiz-config.dto';
+import { ModuleQuizResponseDto } from './dto/module-quiz-response.dto';
 import { UpdateModuleDto } from './dto/update-module.dto';
 import { ModuleService } from './module.service';
 
 @ApiTags('Modules')
 @Controller('modules')
 export class ModuleController {
-  constructor(private readonly moduleService: ModuleService) { }
+  constructor(
+    private readonly moduleService: ModuleService,
+    private readonly userAttemptsService: UserAttemptsService,
+  ) { }
 
 
   @UseGuards(JwtGuard, RolesGuard)
@@ -59,23 +67,79 @@ export class ModuleController {
     return this.moduleService.findOne(id);
   }
 
-  @Get(':id/quiz')
-  @ApiOperation({ summary: 'Get a quiz for a module with its questions' })
-  @ApiOkResponse({ description: 'Quiz for the module with ordered questions' })
+  @Get(':id/quiz-configs')
+  @ApiOperation({ summary: 'Get all available quiz configurations for a module' })
+  @ApiOkResponse({ description: 'List of quiz configurations' })
   @ApiNotFoundResponse({ description: 'Module not found' })
-  @ApiQuery({
-    name: 'numQuestions',
-    required: false,
-    type: Number,
-    description: 'Number of random questions to include in the quiz (default: 10)',
-    example: 10,
-  })
-  getModuleQuiz(
-    @Param('id') id: string,
-    @Query('numQuestions') numQuestions?: string
+  async getQuizConfigs(@Param('id') id: string) {
+    return this.moduleService.getQuizConfigsByModule(id);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Post(':id/quiz-configs')
+  @ApiOperation({ summary: 'Create a new quiz configuration for a module (Admin only)' })
+  @ApiCreatedResponse({ description: 'Quiz configuration created successfully' })
+  @ApiBody({ type: CreateQuizConfigDto })
+  @ApiBearerAuth()
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden' })
+  async createQuizConfig(
+    @Param('id') moduleId: string,
+    @Body() createQuizConfigDto: CreateQuizConfigDto
   ) {
-    const num = numQuestions ? parseInt(numQuestions, 10) : undefined;
-    return this.moduleService.getQuizByModule(id, num);
+    return this.moduleService.createQuizConfig(moduleId, createQuizConfigDto);
+  }
+
+  @UseGuards(JwtGuard)
+  @Get(':id/quiz')
+  @ApiOperation({ summary: 'Start a quiz for a module with selected configuration (creates a UserAttempt automatically)' })
+  @ApiOkResponse({ description: 'Quiz started with questions and timing info', type: ModuleQuizResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid quiz config' })
+  @ApiNotFoundResponse({ description: 'Module or quiz config not found' })
+  @ApiQuery({ name: 'quizConfigId', required: true, type: String, description: 'ID of the quiz configuration to use' })
+  async getModuleQuiz(
+    @Param('id') id: string,
+    @CurrentUser() user: any,
+    @Query('quizConfigId') quizConfigId: string
+  ) {
+    const quiz = await this.moduleService.getQuizByModule(id, quizConfigId);
+    // Automatically create a UserAttempt for this quiz for the current user
+    const attempt = await this.userAttemptsService.createAttempt({
+      userId: user.id,
+      quizId: quiz.quiz.id
+    });
+
+    // Calculate deadline for frontend
+    const startedAt = attempt.startedAt;
+    const deadline = new Date(startedAt.getTime() + quiz.quiz.durationSec * 1000);
+
+    return {
+      userAttemptId: attempt.id,
+      startedAt: startedAt.toISOString(),
+      deadline: deadline.toISOString(),
+      durationSec: quiz.quiz.durationSec,
+      ...quiz
+    };
+  }
+
+  @UseGuards(JwtGuard)
+  @Post('/quiz/submit')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Submit quiz answers for a user attempt (this endpoint handles saving answers and calculating score)' })
+  @ApiBody({ type: SubmitQuizDto })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden' })
+  @ApiBadRequestResponse({ description: 'Missing or invalid payload' })
+  @ApiOkResponse({ description: 'Quiz submitted successfully. Returns score.', schema: { example: { success: true, score: 8 } } })
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  async submitQuiz(
+    @CurrentUser() user: any,
+    @Body(ValidationPipe) body: SubmitQuizDto
+  ) {
+    // (Optionally: verify attempt belongs to this user)
+    const score = await this.userAttemptsService.submitQuizAnswers(body.userAttemptId, body.answers);
+    return { success: true, score };
   }
 
 
