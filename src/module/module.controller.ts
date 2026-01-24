@@ -9,6 +9,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { SubmitQuizDto } from '../user-attempts/dto/submit-quiz.dto';
 import { UserAttemptsService } from '../user-attempts/user-attempts.service';
 import { CreateModuleDto } from './dto/create-module.dto';
+import { CreateQuizConfigDto } from './dto/create-quiz-config.dto';
 import { ModuleQuizResponseDto } from './dto/module-quiz-response.dto';
 import { UpdateModuleDto } from './dto/update-module.dto';
 import { ModuleService } from './module.service';
@@ -66,27 +67,58 @@ export class ModuleController {
     return this.moduleService.findOne(id);
   }
 
+  @Get(':id/quiz-configs')
+  @ApiOperation({ summary: 'Get all available quiz configurations for a module' })
+  @ApiOkResponse({ description: 'List of quiz configurations' })
+  @ApiNotFoundResponse({ description: 'Module not found' })
+  async getQuizConfigs(@Param('id') id: string) {
+    return this.moduleService.getQuizConfigsByModule(id);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Post(':id/quiz-configs')
+  @ApiOperation({ summary: 'Create a new quiz configuration for a module (Admin only)' })
+  @ApiCreatedResponse({ description: 'Quiz configuration created successfully' })
+  @ApiBody({ type: CreateQuizConfigDto })
+  @ApiBearerAuth()
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden' })
+  async createQuizConfig(
+    @Param('id') moduleId: string,
+    @Body() createQuizConfigDto: CreateQuizConfigDto
+  ) {
+    return this.moduleService.createQuizConfig(moduleId, createQuizConfigDto);
+  }
+
   @UseGuards(JwtGuard)
   @Get(':id/quiz')
-  @ApiOperation({ summary: 'Get a quiz for a module with its questions (creates a UserAttempt automatically for the current user).' })
-  @ApiOkResponse({ description: 'Quiz for the module with ordered questions', type: ModuleQuizResponseDto })
-  @ApiBadRequestResponse({ description: 'Invalid number of questions' })
-  @ApiNotFoundResponse({ description: 'Module not found' })
-  @ApiQuery({ name: 'numQuestions', required: false, type: Number, description: 'Number of random questions to include in the quiz (default: 10)', example: 10 })
+  @ApiOperation({ summary: 'Start a quiz for a module with selected configuration (creates a UserAttempt automatically)' })
+  @ApiOkResponse({ description: 'Quiz started with questions and timing info', type: ModuleQuizResponseDto })
+  @ApiBadRequestResponse({ description: 'Invalid quiz config' })
+  @ApiNotFoundResponse({ description: 'Module or quiz config not found' })
+  @ApiQuery({ name: 'quizConfigId', required: true, type: String, description: 'ID of the quiz configuration to use' })
   async getModuleQuiz(
     @Param('id') id: string,
     @CurrentUser() user: any,
-    @Query('numQuestions') numQuestions?: string
+    @Query('quizConfigId') quizConfigId: string
   ) {
-    const num = numQuestions ? parseInt(numQuestions, 10) : undefined;
-    const quiz = await this.moduleService.getQuizByModule(id, num);
+    const quiz = await this.moduleService.getQuizByModule(id, quizConfigId);
     // Automatically create a UserAttempt for this quiz for the current user
     const attempt = await this.userAttemptsService.createAttempt({
       userId: user.id,
       quizId: quiz.quiz.id
     });
+
+    // Calculate deadline for frontend
+    const startedAt = attempt.startedAt;
+    const deadline = new Date(startedAt.getTime() + quiz.quiz.durationSec * 1000);
+
     return {
       userAttemptId: attempt.id,
+      startedAt: startedAt.toISOString(),
+      deadline: deadline.toISOString(),
+      durationSec: quiz.quiz.durationSec,
       ...quiz
     };
   }

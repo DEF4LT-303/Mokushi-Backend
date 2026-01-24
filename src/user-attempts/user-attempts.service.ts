@@ -43,10 +43,51 @@ export class UserAttemptsService {
   }
 
   async submitQuizAnswers(userAttemptId: string, answers: { quizQuestionId: string, answer: string }[]) {
+    // Fetch the attempt with quiz and config to check timing
+    const attempt = await this.databaseService.userAttempt.findUnique({
+      where: { id: userAttemptId },
+      include: {
+        quiz: {
+          include: {
+            quizConfig: true,
+          },
+        },
+      },
+    });
+
+    if (!attempt) {
+      throw new NotFoundException(`User attempt with id '${userAttemptId}' not found`);
+    }
+
+    if (attempt.completed) {
+      throw new NotFoundException('This quiz attempt has already been submitted');
+    }
+
+    // Check if time limit has expired
+    if (attempt.quiz.quizConfig) {
+      const deadline = new Date(attempt.startedAt.getTime() + attempt.quiz.quizConfig.durationSec * 1000);
+      const now = new Date();
+
+      if (now > deadline) {
+        // Time expired - mark as completed with current score (if any) and throw error
+        const existingAnswers = await this.databaseService.userAnswer.findMany({
+          where: { userAttemptId },
+        });
+        const expiredScore = existingAnswers.filter(a => a.correct).length;
+        await this.databaseService.userAttempt.update({
+          where: { id: userAttemptId },
+          data: { completed: true, score: expiredScore, submittedAt: now },
+        });
+        throw new NotFoundException('Quiz time limit has expired. Your attempt has been automatically submitted.');
+      }
+    }
+
+    // Validate and save answers
     const quizQuestions = await this.databaseService.quizQuestion.findMany({
       where: { id: { in: answers.map(a => a.quizQuestionId) } },
       include: { question: true },
     });
+
     const userAnswersToSave = answers.map(ans => {
       const qq = quizQuestions.find(qq => qq.id === ans.quizQuestionId);
       if (!qq) throw new NotFoundException('Invalid quizQuestionId: ' + ans.quizQuestionId);
@@ -58,13 +99,18 @@ export class UserAttemptsService {
         correct: isCorrect,
       };
     });
+
     await this.databaseService.userAnswer.deleteMany({ where: { userAttemptId } });
     await this.databaseService.userAnswer.createMany({ data: userAnswersToSave });
+
     const score = userAnswersToSave.filter(a => a.correct).length;
+    const submittedAt = new Date();
+
     await this.databaseService.userAttempt.update({
       where: { id: userAttemptId },
-      data: { score, completed: true },
+      data: { score, completed: true, submittedAt },
     });
+
     return score;
   }
 }
