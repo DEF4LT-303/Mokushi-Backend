@@ -148,7 +148,21 @@ export class AuthService {
   }
 
   async getCurrentUser(userId: string) {
-    return this.usersService.findById(userId);
+    try {
+      if (!userId) {
+        throw new Error('User ID is required');
+      }
+
+      const user = await this.usersService.findById(userId);
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      return user;
+    } catch (error) {
+      throw new Error(error instanceof Error ? error.message : 'Failed to retrieve user');
+    }
   }
 }
 
