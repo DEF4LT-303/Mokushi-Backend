@@ -184,4 +184,11 @@ export class AuthController {
       message: 'User is not authenticated'
     };
   }
+
+  @Get('test')
+  @ApiOperation({ summary: 'Test route' })
+  @ApiResponse({ status: 200, description: 'Test message' })
+  async test() {
+    return 'Server is running...';
+  }
 }
