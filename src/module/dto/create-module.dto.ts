@@ -42,6 +42,10 @@ export class CreateModuleDto {
   @IsObject()
   instructions: Record<string, any>;
 
+  @ApiProperty({ description: 'Rules for the module' })
+  @IsObject()
+  rules: Record<string, any>;
+
   @ApiProperty({ description: 'Motivational quote' })
   @IsString()
   motivationalQuote: string;
@@ -54,7 +58,7 @@ export class CreateModuleDto {
   @IsEnum(CategoryType)
   categoryType: CategoryType;
 
-  @ApiPropertyOptional({ 
+  @ApiPropertyOptional({
     description: 'Optional array of quiz configurations to create with this module',
     type: [QuizConfigInputDto]
   })

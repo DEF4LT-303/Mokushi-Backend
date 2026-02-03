@@ -67,9 +67,9 @@ model Module {
   slug               String       @unique
   name               String
   description        String
-  learningObjectives Json
-  instructions       Json
-  rules              Json
+  learningObjectives Json?
+  instructions       Json?
+  rules              Json?
   motivationalQuote  String
   jlptLevel          JlptLevel
   categoryType       CategoryType

@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { JlptLevel, CategoryType, PrismaClient, QuestionType, Role } from '@prisma/client';
+import { CategoryType, JlptLevel, PrismaClient, QuestionType, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -31,9 +31,17 @@ async function main() {
   const questions = await createQuestions(modules);
   console.log(`❓ Created ${questions.length} questions`);
 
-  // Create quizzes
-  // const quizzes = await createQuizzes(questions, modules);
-  // console.log(`📝 Created ${quizzes.length} quizzes`);
+  // Quiz configs are created with modules; collect them
+  const quizConfigs = modules.flatMap((m: any) => m.quizConfigs ?? []);
+  console.log(`⚙️ Found ${quizConfigs.length} quiz configs (created with modules)`);
+
+  // Create quizzes (aggregate + module specific)
+  const quizzes = await createQuizzes(questions, modules, quizConfigs);
+  console.log(`📝 Created ${quizzes.length} quizzes`);
+
+  // Create some sample user attempts and answers
+  const attempts = await createSampleAttempts(users, quizzes);
+  console.log(`🧪 Created ${attempts.length} sample user attempts`);
 
   console.log('✅ Database seeding completed successfully!');
 }
@@ -84,7 +92,7 @@ async function createUsers() {
 async function createModules() {
   const modules: any[] = [];
 
-  // JLPT N5 Modules
+  // JLPT N5 Modules (include required `rules` JSON)
   const n5Modules = [
     {
       slug: 'n5-hiragana-reading',
@@ -98,15 +106,16 @@ async function createModules() {
         'Understand hiragana pronunciation'
       ],
       motivationalQuote: 'Every expert was once a beginner. Start your journey with hiragana!',
-      instructions: {
-        steps: [
-          'Read each hiragana character carefully',
-          'Practice pronunciation',
-          'Complete the exercises'
-        ],
-        duration: '15 minutes',
-        difficulty: 'Beginner'
-      },
+      instructions: [
+        'Read each hiragana character carefully',
+        'Practice pronunciation',
+        'Complete the exercises'
+      ],
+      rules: [
+        'Allowed attempts: 3',
+        'Passing score: 70%',
+        'Shuffle questions: true'
+      ]
     },
     {
       slug: 'n5-katakana-reading',
@@ -120,15 +129,16 @@ async function createModules() {
         'Understand katakana pronunciation'
       ],
       motivationalQuote: 'Katakana opens the door to foreign words in Japanese!',
-      instructions: {
-        steps: [
-          'Read each katakana character carefully',
-          'Practice pronunciation',
-          'Complete the exercises'
-        ],
-        duration: '15 minutes',
-        difficulty: 'Beginner'
-      },
+      instructions: [
+        'Read each katakana character carefully',
+        'Practice pronunciation',
+        'Complete the exercises'
+      ],
+      rules: [
+        'Allowed attempts: 3',
+        'Passing score: 70%',
+        'Shuffle questions: true'
+      ]
     },
     {
       slug: 'n5-basic-vocabulary',
@@ -142,15 +152,16 @@ async function createModules() {
         'Practice word usage'
       ],
       motivationalQuote: 'Vocabulary is the foundation of language learning!',
-      instructions: {
-        steps: [
-          'Study each vocabulary word',
-          'Learn the meaning and usage',
-          'Complete practice questions'
-        ],
-        duration: '20 minutes',
-        difficulty: 'Beginner'
-      },
+      instructions: [
+        'Study each vocabulary word',
+        'Learn the meaning and usage',
+        'Complete practice questions'
+      ],
+      rules: [
+        'Allowed attempts: 3',
+        'Passing score: 70%',
+        'Shuffle questions: false'
+      ]
     },
     {
       slug: 'n5-listening-basics',
@@ -164,15 +175,16 @@ async function createModules() {
         'Understand simple conversations'
       ],
       motivationalQuote: 'Listening is the key to real communication!',
-      instructions: {
-        steps: [
-          'Listen to the audio carefully',
-          'Answer comprehension questions',
-          'Review your answers'
-        ],
-        duration: '25 minutes',
-        difficulty: 'Beginner'
-      },
+      instructions: [
+        'Listen to the audio carefully',
+        'Answer comprehension questions',
+        'Review your answers'
+      ],
+      rules: [
+        'Allowed attempts: 5',
+        'Passing score: 60%',
+        'Shuffle questions: false'
+      ]
     },
     {
       slug: 'n5-basic-kanji',
@@ -186,15 +198,16 @@ async function createModules() {
         'Practice kanji recognition'
       ],
       motivationalQuote: 'Kanji is the heart of written Japanese!',
-      instructions: {
-        steps: [
-          'Study each kanji character',
-          'Learn both on-yomi and kun-yomi readings',
-          'Complete practice questions'
-        ],
-        duration: '20 minutes',
-        difficulty: 'Beginner'
-      },
+      instructions: [
+        'Study each kanji character',
+        'Learn both on-yomi and kun-yomi readings',
+        'Complete practice questions'
+      ],
+      rules: [
+        'Allowed attempts: 4',
+        'Passing score: 75%',
+        'Shuffle questions: true'
+      ]
     },
   ];
 
@@ -202,7 +215,19 @@ async function createModules() {
 
   for (const moduleData of allModules) {
     const module = await prisma.module.create({
-      data: moduleData,
+      data: {
+        ...moduleData,
+        quizConfigs: {
+          create: {
+            name: `${moduleData.name} Default Config`,
+            numQuestions: 10,
+            durationSec: 600,
+          },
+        },
+      },
+      include: {
+        quizConfigs: true,
+      },
     });
     modules.push(module);
   }
@@ -318,7 +343,7 @@ function generateCorrectOptions(content: string) {
   if (content.includes('飲み物')) return ['drink'];
   if (content.includes('家族')) return ['family'];
   if (content.includes('学校')) return ['school'];
-  
+
   // Kanji readings
   if (content.includes('人')) return ['ひと', 'じん'];
   if (content.includes('大')) return ['おお', 'だい'];
@@ -334,9 +359,9 @@ function generateCorrectOptions(content: string) {
 
 function generateWrongOptions(content: string) {
   // If it's a kanji question, provide realistic wrong readings
-  if (content.includes('人') || content.includes('大') || content.includes('小') || 
-      content.includes('山') || content.includes('川') || content.includes('田') || 
-      content.includes('木') || content.includes('火')) {
+  if (content.includes('人') || content.includes('大') || content.includes('小') ||
+    content.includes('山') || content.includes('川') || content.includes('田') ||
+    content.includes('木') || content.includes('火')) {
     const wrongKanjiReadings = [
       'あか', 'あお', 'しろ', 'くろ', 'みどり',
       'みず', 'つち', 'かぜ', 'そら', 'ほし',
@@ -344,7 +369,7 @@ function generateWrongOptions(content: string) {
     ];
     return faker.helpers.arrayElements(wrongKanjiReadings, 3);
   }
-  
+
   // For vocabulary questions, use generic wrong options
   const wrongOptions = [
     'wrong1', 'wrong2', 'wrong3', 'wrong4', 'wrong5',
@@ -375,13 +400,64 @@ function generateExplanation(questionType: QuestionType) {
   return faker.helpers.arrayElement(explanations[questionType]);
 }
 
-async function createQuizzes(questions: any[], modules: any[]) {
+
+// Create sample user attempts and user answers for the first quiz
+async function createSampleAttempts(users: any[], quizzes: any[]) {
+  const attempts: any[] = [];
+  if (!quizzes.length) return attempts;
+
+  const quiz = quizzes[0];
+  const quizQuestions = await prisma.quizQuestion.findMany({ where: { quizId: quiz.id } });
+
+  // create attempts for a few users
+  for (let i = 1; i < Math.min(4, users.length); i++) {
+    const user = users[i];
+    let correctCount = 0;
+
+    const userAttempt = await prisma.userAttempt.create({
+      data: {
+        userId: user.id,
+        quizId: quiz.id,
+        score: 0,
+        completed: true,
+        startedAt: new Date(),
+        submittedAt: new Date(),
+      },
+    });
+
+    for (const qq of quizQuestions) {
+      const question = await prisma.question.findUnique({ where: { id: qq.questionId } });
+      const options = (question as any)?.options || [];
+      const chosen = faker.helpers.arrayElement(options.length ? options : ['answer1']);
+      const correct = chosen === (question as any)?.correctAnswer;
+      if (correct) correctCount++;
+
+      await prisma.userAnswer.create({
+        data: {
+          userAttemptId: userAttempt.id,
+          quizQuestionId: qq.id,
+          answer: chosen as any,
+          correct,
+        },
+      });
+    }
+
+    const pct = Math.round((correctCount / (quizQuestions.length || 1)) * 100);
+    await prisma.userAttempt.update({ where: { id: userAttempt.id }, data: { score: pct } });
+
+    attempts.push(userAttempt);
+  }
+
+  return attempts;
+}
+
+async function createQuizzes(questions: any[], modules: any[], quizConfigs: any[] = []) {
   const quizzes: any[] = [];
 
   // Get N5 module IDs
-  const n5ModuleIds = modules.filter(m => m.jlptLevel === 'N5').map(m => m.id);
+  const n5ModuleIds = modules.filter(m => m.jlptLevel === JlptLevel.N5).map(m => m.id);
 
-  // Create N5 quiz
+  // Create N5 aggregated quiz
   const n5Questions = questions.filter(q => n5ModuleIds.includes(q.moduleId));
 
   if (n5Questions.length > 0) {
@@ -404,6 +480,34 @@ async function createQuizzes(questions: any[], modules: any[]) {
       });
     }
     quizzes.push(n5Quiz);
+  }
+
+  // Create module-specific quizzes using quiz configs
+  for (const qc of quizConfigs) {
+    const moduleQuestions = questions.filter(q => q.moduleId === qc.moduleId);
+    if (moduleQuestions.length === 0) continue;
+
+    const quiz = await prisma.quiz.create({
+      data: {
+        title: `${qc.name} - ${faker.word.noun()}`,
+        jlptLevel: modules.find(m => m.id === qc.moduleId)?.jlptLevel || JlptLevel.N5,
+        moduleId: qc.moduleId,
+        quizConfigId: qc.id,
+      },
+    });
+
+    const selected = faker.helpers.arrayElements(moduleQuestions, Math.min(qc.numQuestions, moduleQuestions.length));
+    for (let i = 0; i < selected.length; i++) {
+      await prisma.quizQuestion.create({
+        data: {
+          quizId: quiz.id,
+          questionId: selected[i].id,
+          order: i + 1,
+        },
+      });
+    }
+
+    quizzes.push(quiz);
   }
 
   return quizzes;
