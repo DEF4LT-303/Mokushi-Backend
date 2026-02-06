@@ -4,44 +4,89 @@ import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
+// CLI parsing: pass names like `users rules modules` to run specific seeders
+const requested = process.argv.slice(2).map(s => s.toLowerCase()); // e.g. ['users','rules']
+function shouldRun(name: string) {
+  if (!requested.length) return true; // no args -> run all
+  return requested.includes(name.toLowerCase()) || requested.includes('all');
+}
+
 async function main() {
   console.log('🌱 Starting database seeding...');
 
-  // Clear existing data
-  await prisma.userAnswer.deleteMany();
-  await prisma.userAttempt.deleteMany();
-  await prisma.quizQuestion.deleteMany();
-  await prisma.quiz.deleteMany();
-  await prisma.question.deleteMany();
-  await prisma.module.deleteMany();
-  await prisma.refreshToken.deleteMany();
-  await prisma.user.deleteMany();
-
-  console.log('🧹 Cleared existing data');
+  // No global deletion: each seeder will clean up only the rows it owns.
+  console.log('🧹 No global deletion. Running targeted cleanup per requested seed(s)');
+  // Variables to hold created data (so dependent seeders can run even if some skipped)
+  let users: any[] = [];
+  let rules: any[] = [];
+  let modules: any[] = [];
+  let questions: any[] = [];
+  let quizzes: any[] = [];
+  let attempts: any[] = [];
 
   // Create users
-  const users = await createUsers();
-  console.log(`👥 Created ${users.length} users`);
+  if (shouldRun('users')) {
+    // Remove previous seed users (keep real users)
+    await prisma.user.deleteMany({ where: { email: { contains: 'seed+' } } });
+    users = await createUsers();
+    console.log(`👥 Created ${users.length} users`);
+  }
+
+  // Create rules
+  if (shouldRun('rules')) {
+    // Remove previous seed rules
+    await prisma.rule.deleteMany({ where: { name: { in: ['Grammar Rules', 'Vocabulary Rules', 'Listening Rules'] } } });
+    rules = await createRules();
+    console.log(`📜 Created ${rules.length} rules`);
+  }
 
   // Create modules
-  const modules = await createModules();
-  console.log(`📚 Created ${modules.length} modules`);
+  if (shouldRun('modules')) {
+    // Remove previous seed modules by slug (cascades to related questions/quizConfigs/quizzes)
+    await prisma.module.deleteMany({ where: { slug: { in: ['n5-hiragana-reading', 'n5-katakana-reading', 'n5-basic-vocabulary', 'n5-listening-basics', 'n5-basic-kanji'] } } });
+    modules = await createModules();
+    console.log(`📚 Created ${modules.length} modules`);
+  }
 
   // Create questions
-  const questions = await createQuestions(modules);
-  console.log(`❓ Created ${questions.length} questions`);
+  if (shouldRun('questions')) {
+    // Remove previous seed questions belonging to our module slugs (if modules weren't re-created this run, find existing module ids)
+    const seedModuleSlugs = ['n5-hiragana-reading', 'n5-katakana-reading', 'n5-basic-vocabulary', 'n5-listening-basics', 'n5-basic-kanji'];
+    const existingModules = await prisma.module.findMany({ where: { slug: { in: seedModuleSlugs } } });
+    const moduleIds = existingModules.map(m => m.id);
+    if (moduleIds.length) {
+      await prisma.question.deleteMany({ where: { moduleId: { in: moduleIds } } });
+    }
+    questions = await createQuestions(modules);
+    console.log(`❓ Created ${questions.length} questions`);
+  }
 
   // Quiz configs are created with modules; collect them
   const quizConfigs = modules.flatMap((m: any) => m.quizConfigs ?? []);
-  console.log(`⚙️ Found ${quizConfigs.length} quiz configs (created with modules)`);
-
-  // Create quizzes (aggregate + module specific)
-  const quizzes = await createQuizzes(questions, modules, quizConfigs);
-  console.log(`📝 Created ${quizzes.length} quizzes`);
+  if (shouldRun('quizzes')) {
+    // Remove previous seed quizzes (aggregated and module-specific)
+    const seedModuleSlugs = ['n5-hiragana-reading', 'n5-katakana-reading', 'n5-basic-vocabulary', 'n5-listening-basics', 'n5-basic-kanji'];
+    const existingModules = await prisma.module.findMany({ where: { slug: { in: seedModuleSlugs } } });
+    const moduleIds = existingModules.map(m => m.id);
+    await prisma.quiz.deleteMany({ where: { OR: [{ title: 'JLPT N5 Practice Quiz' }, { moduleId: { in: moduleIds } }] } });
+    quizzes = await createQuizzes(questions, modules, quizConfigs);
+    console.log(`📝 Created ${quizzes.length} quizzes`);
+  }
 
   // Create some sample user attempts and answers
-  const attempts = await createSampleAttempts(users, quizzes);
-  console.log(`🧪 Created ${attempts.length} sample user attempts`);
+  if (shouldRun('attempts')) {
+    // Remove previous seed attempts for quizzes created by seed
+    const seedModuleSlugs = ['n5-hiragana-reading', 'n5-katakana-reading', 'n5-basic-vocabulary', 'n5-listening-basics', 'n5-basic-kanji'];
+    const existingModules = await prisma.module.findMany({ where: { slug: { in: seedModuleSlugs } } });
+    const moduleIds = existingModules.map(m => m.id);
+    const seedQuizzes = await prisma.quiz.findMany({ where: { OR: [{ title: 'JLPT N5 Practice Quiz' }, { moduleId: { in: moduleIds } }] } });
+    const seedQuizIds = seedQuizzes.map(q => q.id);
+    if (seedQuizIds.length) {
+      await prisma.userAttempt.deleteMany({ where: { quizId: { in: seedQuizIds } } });
+    }
+    attempts = await createSampleAttempts(users, quizzes);
+    console.log(`🧪 Created ${attempts.length} sample user attempts`);
+  }
 
   console.log('✅ Database seeding completed successfully!');
 }
@@ -51,8 +96,17 @@ async function createUsers() {
 
   // Create admin user
   const adminPassword = await bcrypt.hash('admin123', 10);
-  const admin = await prisma.user.create({
-    data: {
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@mokushi.com' },
+    update: {
+      password: adminPassword,
+      fullName: 'Admin User',
+      firstName: 'Admin',
+      lastName: 'User',
+      role: Role.ADMIN,
+      provider: 'local',
+    },
+    create: {
       email: 'admin@mokushi.com',
       password: adminPassword,
       fullName: 'Admin User',
@@ -62,13 +116,13 @@ async function createUsers() {
       provider: 'local',
     },
   });
-  users.push(admin);
+  users.push(admin as any);
 
-  // Create regular users
+  // Create identifiable seed users (emails contain 'seed+' so they can be targeted for cleanup)
   for (let i = 0; i < 10; i++) {
     const firstName = faker.person.firstName();
     const lastName = faker.person.lastName();
-    const email = faker.internet.email({ firstName, lastName });
+    const email = `seed+${i}@mokushi.local`;
     const password = await bcrypt.hash('password123', 10);
 
     const user = await prisma.user.create({
@@ -87,6 +141,49 @@ async function createUsers() {
   }
 
   return users;
+}
+
+async function createRules() {
+  const rulesData = [
+    {
+      name: 'Grammar Rules',
+      rules: {
+        items: [
+          'Use particles correctly (は/が/を/に)',
+          'Conjugate verbs according to tense and politeness',
+          'Keep proper word order (Subject-Object-Verb)'
+        ]
+      }
+    },
+    {
+      name: 'Vocabulary Rules',
+      rules: {
+        items: [
+          'Learn words in context rather than isolation',
+          'Practice spaced repetition for retention',
+          'Use example sentences to understand usage'
+        ]
+      }
+    },
+    {
+      name: 'Listening Rules',
+      rules: {
+        items: [
+          'Listen actively and repeatedly to short clips',
+          'Follow along with transcripts when available',
+          'Focus on rhythm, intonation and common phrases'
+        ]
+      }
+    },
+  ];
+
+  const created: any[] = [];
+  for (const r of rulesData) {
+    const rec = await prisma.rule.create({ data: r });
+    created.push(rec);
+  }
+
+  return created;
 }
 
 async function createModules() {
@@ -110,11 +207,6 @@ async function createModules() {
         'Read each hiragana character carefully',
         'Practice pronunciation',
         'Complete the exercises'
-      ],
-      rules: [
-        'Allowed attempts: 3',
-        'Passing score: 70%',
-        'Shuffle questions: true'
       ]
     },
     {
@@ -133,11 +225,6 @@ async function createModules() {
         'Read each katakana character carefully',
         'Practice pronunciation',
         'Complete the exercises'
-      ],
-      rules: [
-        'Allowed attempts: 3',
-        'Passing score: 70%',
-        'Shuffle questions: true'
       ]
     },
     {
@@ -156,11 +243,6 @@ async function createModules() {
         'Study each vocabulary word',
         'Learn the meaning and usage',
         'Complete practice questions'
-      ],
-      rules: [
-        'Allowed attempts: 3',
-        'Passing score: 70%',
-        'Shuffle questions: false'
       ]
     },
     {
@@ -179,11 +261,6 @@ async function createModules() {
         'Listen to the audio carefully',
         'Answer comprehension questions',
         'Review your answers'
-      ],
-      rules: [
-        'Allowed attempts: 5',
-        'Passing score: 60%',
-        'Shuffle questions: false'
       ]
     },
     {
@@ -202,11 +279,6 @@ async function createModules() {
         'Study each kanji character',
         'Learn both on-yomi and kun-yomi readings',
         'Complete practice questions'
-      ],
-      rules: [
-        'Allowed attempts: 4',
-        'Passing score: 75%',
-        'Shuffle questions: true'
       ]
     },
   ];
