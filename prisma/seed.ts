@@ -14,6 +14,7 @@ async function main() {
   await prisma.quiz.deleteMany();
   await prisma.question.deleteMany();
   await prisma.module.deleteMany();
+  await prisma.rule.deleteMany();
   await prisma.refreshToken.deleteMany();
   await prisma.user.deleteMany();
 
@@ -22,6 +23,10 @@ async function main() {
   // Create users
   const users = await createUsers();
   console.log(`👥 Created ${users.length} users`);
+
+  // Create rules
+  const rules = await createRules();
+  console.log(`📜 Created ${rules.length} rules`);
 
   // Create modules
   const modules = await createModules();
@@ -89,6 +94,49 @@ async function createUsers() {
   return users;
 }
 
+async function createRules() {
+  const rulesData = [
+    {
+      name: 'Grammar Rules',
+      rules: {
+        items: [
+          'Use particles correctly (は/が/を/に)',
+          'Conjugate verbs according to tense and politeness',
+          'Keep proper word order (Subject-Object-Verb)'
+        ]
+      }
+    },
+    {
+      name: 'Vocabulary Rules',
+      rules: {
+        items: [
+          'Learn words in context rather than isolation',
+          'Practice spaced repetition for retention',
+          'Use example sentences to understand usage'
+        ]
+      }
+    },
+    {
+      name: 'Listening Rules',
+      rules: {
+        items: [
+          'Listen actively and repeatedly to short clips',
+          'Follow along with transcripts when available',
+          'Focus on rhythm, intonation and common phrases'
+        ]
+      }
+    },
+  ];
+
+  const created: any[] = [];
+  for (const r of rulesData) {
+    const rec = await prisma.rule.create({ data: r });
+    created.push(rec);
+  }
+
+  return created;
+}
+
 async function createModules() {
   const modules: any[] = [];
 
@@ -110,11 +158,6 @@ async function createModules() {
         'Read each hiragana character carefully',
         'Practice pronunciation',
         'Complete the exercises'
-      ],
-      rules: [
-        'Allowed attempts: 3',
-        'Passing score: 70%',
-        'Shuffle questions: true'
       ]
     },
     {
@@ -133,11 +176,6 @@ async function createModules() {
         'Read each katakana character carefully',
         'Practice pronunciation',
         'Complete the exercises'
-      ],
-      rules: [
-        'Allowed attempts: 3',
-        'Passing score: 70%',
-        'Shuffle questions: true'
       ]
     },
     {
@@ -156,11 +194,6 @@ async function createModules() {
         'Study each vocabulary word',
         'Learn the meaning and usage',
         'Complete practice questions'
-      ],
-      rules: [
-        'Allowed attempts: 3',
-        'Passing score: 70%',
-        'Shuffle questions: false'
       ]
     },
     {
@@ -179,11 +212,6 @@ async function createModules() {
         'Listen to the audio carefully',
         'Answer comprehension questions',
         'Review your answers'
-      ],
-      rules: [
-        'Allowed attempts: 5',
-        'Passing score: 60%',
-        'Shuffle questions: false'
       ]
     },
     {
@@ -202,11 +230,6 @@ async function createModules() {
         'Study each kanji character',
         'Learn both on-yomi and kun-yomi readings',
         'Complete practice questions'
-      ],
-      rules: [
-        'Allowed attempts: 4',
-        'Passing score: 75%',
-        'Shuffle questions: true'
       ]
     },
   ];
