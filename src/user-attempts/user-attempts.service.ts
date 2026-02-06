@@ -1,12 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
+import { CreateUserAnswerDto } from './dto/create-user-answer.dto';
 import { CreateUserAttemptDto } from './dto/create-user-attempt.dto';
 import { UpdateUserAttemptDto } from './dto/update-user-attempt.dto';
-import { CreateUserAnswerDto } from './dto/create-user-answer.dto';
 
 @Injectable()
 export class UserAttemptsService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(private readonly databaseService: DatabaseService) { }
 
   async createAttempt(dto: CreateUserAttemptDto) {
     return this.databaseService.userAttempt.create({
@@ -111,6 +111,32 @@ export class UserAttemptsService {
       data: { score, completed: true, submittedAt },
     });
 
-    return score;
+    // Build detailed results with full question data
+    const results = userAnswersToSave.map(ans => {
+      const qq = quizQuestions.find(q => q.id === ans.quizQuestionId);
+
+      if (!qq) throw new NotFoundException('Question not found for quizQuestionId: ' + ans.quizQuestionId);
+
+      return {
+        quizQuestionId: ans.quizQuestionId,
+        question: {
+          id: qq.question.id,
+          content: qq.question.content,
+          options: qq.question.options,
+          correctAnswer: qq.question.correctAnswer,
+          explanation: qq.question.explanation,
+          questionType: qq.question.questionType,
+        },
+        userAnswer: ans.answer,
+        correctAnswer: qq.question.correctAnswer,
+        isCorrect: ans.correct,
+      };
+    });
+
+    return {
+      score,
+      totalQuestions: results.length,
+      results,
+    };
   }
 }
