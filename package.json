@@ -19,6 +19,14 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "db:seed": "ts-node prisma/seed.ts",
+    "seed": "ts-node prisma/seed.ts",
+    "seed:all": "ts-node prisma/seed.ts all",
+    "seed:rules": "ts-node prisma/seed.ts rules",
+    "seed:users": "ts-node prisma/seed.ts users",
+    "seed:modules": "ts-node prisma/seed.ts modules",
+    "seed:questions": "ts-node prisma/seed.ts questions",
+    "seed:quizzes": "ts-node prisma/seed.ts quizzes",
+    "seed:attempts": "ts-node prisma/seed.ts attempts",
     "db:reset": "prisma migrate reset --force && npm run db:seed"
   },
   "dependencies": {
