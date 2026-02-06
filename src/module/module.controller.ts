@@ -138,8 +138,8 @@ export class ModuleController {
     @Body(ValidationPipe) body: SubmitQuizDto
   ) {
     // (Optionally: verify attempt belongs to this user)
-    const score = await this.userAttemptsService.submitQuizAnswers(body.userAttemptId, body.answers);
-    return { success: true, score };
+    const submission = await this.userAttemptsService.submitQuizAnswers(body.userAttemptId, body.answers);
+    return { success: true, submission };
   }
 
 
