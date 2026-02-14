@@ -6,22 +6,22 @@ class SubmitAnswerDto {
   @ApiProperty({ description: 'QuizQuestion id (UUID)' })
   @IsNotEmpty()
   @IsUUID()
-  quizQuestionId: string;
+  quizQuestionId!: string;
 
   @ApiProperty({ description: 'Answer text chosen by the user' })
   @IsString()
-  answer: string;
+  answer!: string;
 }
 
 export class SubmitQuizDto {
   @ApiProperty({ description: 'User attempt id to which the answers belong' })
   @IsNotEmpty()
   @IsUUID()
-  userAttemptId: string;
+  userAttemptId!: string;
 
   @ApiProperty({ type: [SubmitAnswerDto], description: 'Array of answers for this attempt' })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => SubmitAnswerDto)
-  answers: SubmitAnswerDto[];
+  answers!: SubmitAnswerDto[];
 }

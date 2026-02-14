@@ -7,7 +7,7 @@ export class CreateUserDto {
     example: 'user@example.com',
   })
   @IsEmail()
-  email: string;
+  email!: string;
 
   @ApiProperty({
     description: 'User password',
@@ -15,12 +15,12 @@ export class CreateUserDto {
     minLength: 6,
   })
   @MinLength(6)
-  password: string;
+  password!: string;
 
   @ApiProperty({
     description: 'User name',
     example: 'John Doe',
   })
   @IsNotEmpty()
-  fullName: string;
+  fullName!: string;
 }

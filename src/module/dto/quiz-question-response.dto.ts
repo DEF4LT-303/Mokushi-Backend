@@ -2,19 +2,19 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class QuizQuestionResponseDto {
   @ApiProperty({ description: 'quizQuestion id' })
-  quizQuestionId: string;
+  quizQuestionId!: string;
 
   @ApiProperty({ description: 'question id' })
-  questionId: string;
+  questionId!: string;
 
   @ApiProperty({ description: 'order number in quiz' })
-  order: number;
+  order!: number;
 
   @ApiProperty({ description: 'question text' })
-  content: string;
+  content!: string;
 
   @ApiProperty({ type: [String], description: 'answer options' })
-  options: string[];
+  options!: string[];
 
   @ApiProperty({ required: false })
   explanation?: string;
