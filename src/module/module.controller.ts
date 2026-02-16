@@ -58,6 +58,12 @@ export class ModuleController {
     });
   }
 
+  @Get('rule')
+  @ApiOperation({ summary: 'Get all rules' })
+  @ApiOkResponse({ description: 'List of all rules' })
+  async fetchAllRules() {
+    return this.moduleService.fetchAllRules();
+  }
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a module by ID' })
