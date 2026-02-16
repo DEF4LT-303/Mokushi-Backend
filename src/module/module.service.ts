@@ -213,4 +213,24 @@ export class ModuleService {
       },
     };
   }
+
+  async fetchAllRules() {
+    try {
+      const rules = await this.databaseService.rule.findMany({
+        orderBy: { createdAt: 'asc' },
+      });
+
+      if (!rules || rules.length === 0) {
+        throw new NotFoundException('No rules found');
+      }
+
+      return rules.map(rule => ({
+        id: rule.id,
+        name: rule.name,
+        rules: rule.rules,
+      }));
+    } catch (error) {
+      throw new Error(`Failed to fetch rules: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
 }
