@@ -58,7 +58,7 @@ export class ModuleController {
     });
   }
 
-  @Get('rule')
+  @Get('rules')
   @ApiOperation({ summary: 'Get all rules' })
   @ApiOkResponse({ description: 'List of all rules' })
   async fetchAllRules() {
