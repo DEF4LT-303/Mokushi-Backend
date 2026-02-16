@@ -2,7 +2,7 @@ import { IsEmail } from "class-validator";
 
 export class AuthPayloadDto {
   @IsEmail()
-  email: string;
+  email!: string;
 
-  password: string;
+  password!: string;
 }

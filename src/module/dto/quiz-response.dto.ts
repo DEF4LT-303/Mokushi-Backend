@@ -3,17 +3,17 @@ import { QuizQuestionResponseDto } from './quiz-question-response.dto';
 
 export class QuizResponseDto {
   @ApiProperty()
-  id: string;
+  id!: string;
 
   @ApiProperty()
-  title: string;
+  title!: string;
 
   @ApiProperty()
-  jlptLevel: string;
+  jlptLevel!: string;
 
   @ApiProperty()
-  questionCount: number;
+  questionCount!: number;
 
   @ApiProperty({ type: [QuizQuestionResponseDto] })
-  questions: QuizQuestionResponseDto[];
+  questions!: QuizQuestionResponseDto[];
 }

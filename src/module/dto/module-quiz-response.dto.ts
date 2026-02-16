@@ -3,28 +3,28 @@ import { QuizResponseDto } from './quiz-response.dto';
 
 export class ModuleInfoDto {
   @ApiProperty()
-  id: string;
+  id!: string;
 
   @ApiProperty()
-  slug: string;
+  slug!: string;
 
   @ApiProperty()
-  name: string;
+  name!: string;
 
   @ApiProperty()
-  description: string;
+  description!: string;
 
   @ApiProperty()
-  jlptLevel: string;
+  jlptLevel!: string;
 
   @ApiProperty()
-  categoryType: string;
+  categoryType!: string;
 }
 
 export class ModuleQuizResponseDto {
   @ApiProperty({ type: ModuleInfoDto })
-  module: ModuleInfoDto;
+  module!: ModuleInfoDto;
 
   @ApiProperty({ type: QuizResponseDto })
-  quiz: QuizResponseDto;
+  quiz!: QuizResponseDto;
 }

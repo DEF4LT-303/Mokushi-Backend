@@ -215,7 +215,7 @@ model UserAnswer {
   quizQuestion   QuizQuestion @relation(fields: [quizQuestionId], references: [id], onDelete: Cascade)
   quizQuestionId String
 
-  answer  String
+  answer  String?
   correct Boolean
 
   createdAt DateTime @default(now())

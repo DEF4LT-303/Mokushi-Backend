@@ -5,10 +5,10 @@ export class CreateUserAttemptDto {
   @ApiProperty()
   @IsNotEmpty()
   @IsUUID()
-  userId: string;
+  userId!: string;
 
   @ApiProperty()
   @IsNotEmpty()
   @IsUUID()
-  quizId: string;
+  quizId!: string;
 }
