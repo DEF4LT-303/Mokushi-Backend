@@ -5,13 +5,13 @@ export class CreateUserAnswerDto {
   @ApiProperty()
   @IsNotEmpty()
   @IsUUID()
-  quizQuestionId: string;
+  quizQuestionId!: string;
 
   @ApiProperty()
   @IsString()
-  answer: string;
+  answer!: string;
 
   @ApiProperty()
   @IsBoolean()
-  correct: boolean;
+  correct!: boolean;
 }

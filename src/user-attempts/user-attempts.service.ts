@@ -82,20 +82,24 @@ export class UserAttemptsService {
       }
     }
 
-    // Validate and save answers
-    const quizQuestions = await this.databaseService.quizQuestion.findMany({
-      where: { id: { in: answers.map(a => a.quizQuestionId) } },
+    // Fetch ALL quiz questions for this quiz
+    const quizId = attempt.quizId;
+    const allQuizQuestions = await this.databaseService.quizQuestion.findMany({
+      where: { quizId },
       include: { question: true },
     });
 
-    const userAnswersToSave = answers.map(ans => {
-      const qq = quizQuestions.find(qq => qq.id === ans.quizQuestionId);
-      if (!qq) throw new NotFoundException('Invalid quizQuestionId: ' + ans.quizQuestionId);
-      const isCorrect = ans.answer === qq.question.correctAnswer;
+    // Create a map for quick lookup of submitted answers
+    const answersMap = new Map(answers.map(a => [a.quizQuestionId, a.answer]));
+
+    // Validate all questions and create answer records
+    const userAnswersToSave = allQuizQuestions.map(qq => {
+      const userAnswer = answersMap.get(qq.id);
+      const isCorrect = userAnswer === qq.question.correctAnswer;
       return {
         userAttemptId,
-        quizQuestionId: ans.quizQuestionId,
-        answer: ans.answer,
+        quizQuestionId: qq.id,
+        answer: userAnswer || null,
         correct: isCorrect,
       };
     });
@@ -111,14 +115,12 @@ export class UserAttemptsService {
       data: { score, completed: true, submittedAt },
     });
 
-    // Build detailed results with full question data
-    const results = userAnswersToSave.map(ans => {
-      const qq = quizQuestions.find(q => q.id === ans.quizQuestionId);
-
-      if (!qq) throw new NotFoundException('Question not found for quizQuestionId: ' + ans.quizQuestionId);
+    // Build detailed results with full question data for all questions
+    const results = allQuizQuestions.map((qq) => {
+      const userAnswer = answersMap.get(qq.id);
 
       return {
-        quizQuestionId: ans.quizQuestionId,
+        quizQuestionId: qq.id,
         question: {
           id: qq.question.id,
           content: qq.question.content,
@@ -127,9 +129,9 @@ export class UserAttemptsService {
           explanation: qq.question.explanation,
           questionType: qq.question.questionType,
         },
-        userAnswer: ans.answer,
+        userAnswer: userAnswer || null,
         correctAnswer: qq.question.correctAnswer,
-        isCorrect: ans.correct,
+        isCorrect: userAnswer === qq.question.correctAnswer,
       };
     });
 

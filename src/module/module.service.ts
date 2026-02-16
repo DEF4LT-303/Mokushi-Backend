@@ -29,7 +29,7 @@ export class ModuleService {
     // Return module with quiz configs
     return this.databaseService.module.findUnique({
       where: { id: module.id },
-      include: { quizConfigs: true },
+      include: { quizConfigs: true, rules: true },
     });
   }
 
@@ -51,7 +51,7 @@ export class ModuleService {
         skip,
         take,
         orderBy: { createdAt: 'desc' },
-        include: { quizConfigs: true },
+        include: { quizConfigs: true, rules: true },
       }),
       this.databaseService.module.count({ where })
     ]);
@@ -65,7 +65,7 @@ export class ModuleService {
   async findOne(id: string) {
     const module = await this.databaseService.module.findUnique({
       where: { id },
-      include: { quizConfigs: true },
+      include: { quizConfigs: true, rules: true },
     });
     if (!module) {
       throw new NotFoundException(`Module with id '${id}' not found`);
@@ -100,7 +100,7 @@ export class ModuleService {
     // Return module with quiz configs
     return this.databaseService.module.findUnique({
       where: { id },
-      include: { quizConfigs: true },
+      include: { quizConfigs: true, rules: true },
     });
   }
 
