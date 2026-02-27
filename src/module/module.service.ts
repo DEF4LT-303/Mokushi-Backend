@@ -9,7 +9,7 @@ export class ModuleService {
   constructor(private readonly databaseService: DatabaseService) { }
 
   async create(createModuleDto: CreateModuleDto) {
-    const { quizConfigs, ...moduleData } = createModuleDto;
+    const { quizConfigs, rules, ...moduleData } = createModuleDto;
 
     // Create module first
     const module = await this.databaseService.module.create({
@@ -79,7 +79,7 @@ export class ModuleService {
       throw new NotFoundException(`Module with id '${id}' not found`);
     }
 
-    const { quizConfigs, ...moduleData } = updateModuleDto;
+    const { quizConfigs, rules, ...moduleData } = updateModuleDto;
 
     // Update module fields
     const updatedModule = await this.databaseService.module.update({
