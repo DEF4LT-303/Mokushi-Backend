@@ -2,7 +2,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CategoryType, JlptLevel } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsArray, IsEnum, IsInt, IsObject, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsEnum, IsInt, IsOptional, IsString, Min, ValidateNested } from 'class-validator';
 
 export class QuizConfigInputDto {
   @ApiProperty({ description: 'Name of the quiz configuration (e.g., "10 Questions - 5 Minutes")' })
@@ -39,12 +39,14 @@ export class CreateModuleDto {
   learningObjectives!: string[];
 
   @ApiProperty({ description: 'Instructions for the module' })
-  @IsObject()
-  instructions!: Record<string, any>;
+  @IsArray()
+  @IsString({ each: true })
+  instructions!: string[];
 
   @ApiProperty({ description: 'Rules for the module' })
-  @IsObject()
-  rules!: Record<string, any>;
+  @IsArray()
+  @IsString({ each: true })
+  rules!: string[];
 
   @ApiProperty({ description: 'Motivational quote' })
   @IsString()
