@@ -122,8 +122,8 @@ model Question {
 }
 
 model QuizConfig {
-  id           String @id @default(uuid())
-  name         String
+  id           String  @id @default(uuid())
+  name         String?
   numQuestions Int
   durationSec  Int
 

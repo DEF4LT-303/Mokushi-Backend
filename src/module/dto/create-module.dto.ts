@@ -44,9 +44,8 @@ export class CreateModuleDto {
   instructions!: string[];
 
   @ApiProperty({ description: 'Rules for the module' })
-  @IsArray()
-  @IsString({ each: true })
-  rules!: string[];
+  @IsString()
+  ruleId!: string;
 
   @ApiProperty({ description: 'Motivational quote' })
   @IsString()
