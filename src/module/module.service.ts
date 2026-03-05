@@ -79,7 +79,7 @@ export class ModuleService {
       throw new NotFoundException(`Module with id '${id}' not found`);
     }
 
-    const { quizConfigs, ruleId, ...moduleData } = updateModuleDto;
+    const { quizConfigs, ...moduleData } = updateModuleDto;
 
     // Update module fields
     const updatedModule = await this.databaseService.module.update({
