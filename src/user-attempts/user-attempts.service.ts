@@ -143,22 +143,41 @@ export class UserAttemptsService {
     const score = userAnswersToSave.filter(a => a.correct).length;
     const submittedAt = new Date();
 
+    // Get total questions from quizConfig or actual quiz questions
+    const totalQuestions = allQuizQuestions.length;
+    const normalizedScore = totalQuestions > 0
+      ? parseFloat(((score / totalQuestions) * 100).toFixed(2))
+      : 0;
+
     const updatedAttempt = await this.databaseService.$transaction(async (tx) => {
       await tx.userAnswer.deleteMany({ where: { userAttemptId } });
-
       await tx.userAnswer.createMany({ data: userAnswersToSave });
 
       return tx.userAttempt.update({
         where: { id: userAttemptId },
-        data: { score, completed: true, submittedAt },
-        include: {
-          quiz: true, // IMPORTANT: we need moduleId
-        },
+        data: { score, normalizedScore, completed: true, submittedAt },
+        include: { quiz: true },
       });
     });
 
-    // 🔥 CACHE INVALIDATION HERE
     await this.invalidateLeaderboardCache(updatedAttempt.quiz.moduleId);
+
+    // const updatedAttempt = await this.databaseService.$transaction(async (tx) => {
+    //   await tx.userAnswer.deleteMany({ where: { userAttemptId } });
+
+    //   await tx.userAnswer.createMany({ data: userAnswersToSave });
+
+    //   return tx.userAttempt.update({
+    //     where: { id: userAttemptId },
+    //     data: { score, completed: true, submittedAt },
+    //     include: {
+    //       quiz: true, // IMPORTANT: we need moduleId
+    //     },
+    //   });
+    // });
+
+    // // 🔥 CACHE INVALIDATION HERE
+    // await this.invalidateLeaderboardCache(updatedAttempt.quiz.moduleId);
 
     // Build detailed results with full question data for all questions
     const results = allQuizQuestions.map((qq) => {

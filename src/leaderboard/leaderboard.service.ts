@@ -16,7 +16,6 @@ export class LeaderboardService {
   // ----------------------------
   async getGlobalAverageLeaderboard() {
     const cacheKey = 'leaderboard:global:avg';
-
     const cached = await this.cache.get(cacheKey);
     if (cached) return cached;
 
@@ -24,43 +23,29 @@ export class LeaderboardService {
       by: ['userId'],
       where: {
         completed: true,
+        normalizedScore: { not: null },
       },
-      _avg: {
-        score: true,
-      },
-      _count: {
-        score: true,
-      },
-      orderBy: {
-        _avg: {
-          score: 'desc',
-        },
-      },
+      _avg: { normalizedScore: true },  // was: score
+      _count: { normalizedScore: true }, // was: score
+      orderBy: { _avg: { normalizedScore: 'desc' } },
       take: 50,
     });
 
-    // Filter minimum attempts (IMPORTANT)
-    const filtered = data.filter(d => d._count.score >= 1);
+    const filtered = data.filter(d => d._count.normalizedScore >= 1);
 
-    // Sort (tie-breaker)
     filtered.sort((a, b) => {
-      if (b._avg.score !== a._avg.score) {
-        return (b._avg.score ?? 0) - (a._avg.score ?? 0);
+      if (b._avg.normalizedScore !== a._avg.normalizedScore) {
+        return (b._avg.normalizedScore ?? 0) - (a._avg.normalizedScore ?? 0);
       }
-      return b._count.score - a._count.score;
+      return b._count.normalizedScore - a._count.normalizedScore;
     });
 
     const top10 = filtered.slice(0, 10);
-
     const userIds = top10.map(d => d.userId);
 
     const users = await this.databaseService.user.findMany({
       where: { id: { in: userIds } },
-      select: {
-        id: true,
-        fullName: true,
-        picture: true,
-      },
+      select: { id: true, fullName: true, picture: true },
     });
 
     const result = top10.map(entry => {
@@ -69,13 +54,12 @@ export class LeaderboardService {
         userId: entry.userId,
         name: user?.fullName,
         picture: user?.picture,
-        avgScore: entry._avg.score,
-        attempts: entry._count.score,
+        avgScore: parseFloat((entry._avg.normalizedScore ?? 0).toFixed(2)),
+        attempts: entry._count.normalizedScore,
       };
     });
 
-    await this.cache.set(cacheKey, result, 60_000);
-
+    await this.cache.set(cacheKey, result, 60);
     return result;
   }
 
@@ -84,7 +68,6 @@ export class LeaderboardService {
   // ----------------------------
   async getModuleAverageLeaderboard(moduleId: string) {
     const cacheKey = `leaderboard:module:${moduleId}:avg`;
-
     const cached = await this.cache.get(cacheKey);
     if (cached) return cached;
 
@@ -92,44 +75,30 @@ export class LeaderboardService {
       by: ['userId'],
       where: {
         completed: true,
-        quiz: {
-          moduleId: moduleId,
-        },
+        normalizedScore: { not: null },
+        quiz: { moduleId },
       },
-      _avg: {
-        score: true,
-      },
-      _count: {
-        score: true,
-      },
-      orderBy: {
-        _avg: {
-          score: 'desc',
-        },
-      },
+      _avg: { normalizedScore: true },
+      _count: { normalizedScore: true },
+      orderBy: { _avg: { normalizedScore: 'desc' } },
       take: 50,
     });
 
-    const filtered = data.filter(d => d._count.score >= 1);
+    const filtered = data.filter(d => d._count.normalizedScore >= 1);
 
     filtered.sort((a, b) => {
-      if (b._avg.score !== a._avg.score) {
-        return (b._avg.score ?? 0) - (a._avg.score ?? 0);
+      if (b._avg.normalizedScore !== a._avg.normalizedScore) {
+        return (b._avg.normalizedScore ?? 0) - (a._avg.normalizedScore ?? 0);
       }
-      return b._count.score - a._count.score;
+      return b._count.normalizedScore - a._count.normalizedScore;
     });
 
     const top10 = filtered.slice(0, 10);
-
     const userIds = top10.map(d => d.userId);
 
     const users = await this.databaseService.user.findMany({
       where: { id: { in: userIds } },
-      select: {
-        id: true,
-        fullName: true,
-        picture: true,
-      },
+      select: { id: true, fullName: true, picture: true },
     });
 
     const result = top10.map(entry => {
@@ -138,13 +107,12 @@ export class LeaderboardService {
         userId: entry.userId,
         name: user?.fullName,
         picture: user?.picture,
-        avgScore: entry._avg.score,
-        attempts: entry._count.score,
+        avgScore: parseFloat((entry._avg.normalizedScore ?? 0).toFixed(2)),
+        attempts: entry._count.normalizedScore,
       };
     });
 
-    await this.cache.set(cacheKey, result, 60_000);
-
+    await this.cache.set(cacheKey, result, 60);
     return result;
   }
 }
