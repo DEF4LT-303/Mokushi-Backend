@@ -74,7 +74,7 @@ export class LeaderboardService {
       };
     });
 
-    await this.cache.set(cacheKey, result, 60);
+    await this.cache.set(cacheKey, result, 60_000);
 
     return result;
   }
@@ -143,7 +143,7 @@ export class LeaderboardService {
       };
     });
 
-    await this.cache.set(cacheKey, result, 60);
+    await this.cache.set(cacheKey, result, 60_000);
 
     return result;
   }

@@ -5,11 +5,11 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { AuthMiddleware } from './auth/middleware/auth.middleware';
 import { DatabaseModule } from './database/database.module';
+import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { ModuleModule } from './module/module.module';
 import { QuestionsModule } from './questions/questions.module';
-import { UsersModule } from './users/users.module';
 import { UserAttemptsModule } from './user-attempts/user-attempts.module';
-import { LeaderboardModule } from './leaderboard/leaderboard.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -24,6 +24,10 @@ import { LeaderboardModule } from './leaderboard/leaderboard.module';
       signOptions: { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m' },
     }),
     LeaderboardModule,
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 100,
+    }]),
   ],
   providers: [
     {
