@@ -9,6 +9,7 @@ import { ModuleModule } from './module/module.module';
 import { QuestionsModule } from './questions/questions.module';
 import { UsersModule } from './users/users.module';
 import { UserAttemptsModule } from './user-attempts/user-attempts.module';
+import { LeaderboardModule } from './leaderboard/leaderboard.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { UserAttemptsModule } from './user-attempts/user-attempts.module';
       secret: process.env.JWT_ACCESS_SECRET,
       signOptions: { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m' },
     }),
+    LeaderboardModule,
   ],
   providers: [
     {
