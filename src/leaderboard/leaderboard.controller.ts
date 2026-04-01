@@ -1,6 +1,9 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Param, UseGuards } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiParam, ApiTags } from '@nestjs/swagger';
+import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { OptionalJwtGuard } from 'src/auth/guards/optional-jwt.guard';
 import { LeaderboardEntryDto } from './dto/leaderboard-entry.dto';
+import { LeaderboardResponseDto } from './dto/leaderboard-response.dto';
 import { LeaderboardService } from './leaderboard.service';
 
 @ApiTags('Leaderboard')
@@ -9,13 +12,15 @@ export class LeaderboardController {
   constructor(private readonly leaderboardService: LeaderboardService) { }
 
   @Get('global/average')
-  @ApiOperation({ summary: 'Get global average leaderboard' })
+  @UseGuards(OptionalJwtGuard)
+  @ApiOperation({ summary: 'Get categorized leaderboard with global and module-specific rankings' })
   @ApiOkResponse({
-    description: 'Top users ranked by average score globally',
-    type: [LeaderboardEntryDto],
+    description: 'Categorized leaderboard with Global Program, Grammar, Vocabulary, and Listening rankings',
+    type: LeaderboardResponseDto,
   })
-  getGlobalAverage() {
-    return this.leaderboardService.getGlobalAverageLeaderboard();
+  getGlobalAverage(@CurrentUser() user?: any) {
+    const userId = user?.id || user?.sub;
+    return this.leaderboardService.getCategorizedLeaderboard(userId);
   }
 
   @Get('module/:moduleId/average')
@@ -31,6 +36,6 @@ export class LeaderboardController {
     type: [LeaderboardEntryDto],
   })
   getModuleAverage(@Param('moduleId') moduleId: string) {
-    return this.leaderboardService.getModuleAverageLeaderboard(moduleId);
+    return this.leaderboardService.getModuleLeaderboard(moduleId);
   }
 }
