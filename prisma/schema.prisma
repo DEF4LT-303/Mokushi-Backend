@@ -143,11 +143,9 @@ model Quiz {
   title     String
   jlptLevel JlptLevel
 
-  // Optional association to a Module to support module-specific quizzes
   module   Module? @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   moduleId String?
 
-  // Reference to QuizConfig for timing and question count
   quizConfig   QuizConfig? @relation(fields: [quizConfigId], references: [id], onDelete: SetNull)
   quizConfigId String?
 
@@ -193,10 +191,11 @@ model UserAttempt {
 
   userAnswers UserAnswer[]
 
-  score       Int
-  completed   Boolean   @default(false)
-  startedAt   DateTime  @default(now()) // When user started the quiz session
-  submittedAt DateTime? // When user submitted (null if not submitted yet)
+  score           Int
+  normalizedScore Float?
+  completed       Boolean   @default(false)
+  startedAt       DateTime  @default(now())
+  submittedAt     DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
