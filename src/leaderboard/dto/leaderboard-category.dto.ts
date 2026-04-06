@@ -19,4 +19,10 @@ export class LeaderboardCategoryDto {
     nullable: true,
   })
   currentUserRank?: UserRankDto | null;
+
+  @ApiProperty({
+    description: 'Total number of candidates in this leaderboard',
+    example: 42,
+  })
+  totalUsers!: number;
 }
