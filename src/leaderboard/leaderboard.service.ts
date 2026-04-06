@@ -91,24 +91,35 @@ export class LeaderboardService {
     const result = {
       top10: formattedTop,
       currentUserRank,
+      totalUsers: filtered.length,
     };
 
     await this.cache.set(cacheKey, result, 60);
     return result;
   }
 
-  // ============================
+  private buildWhereCondition(jlptLevel?: string): any {
+    const where: any = {
+      completed: true,
+      normalizedScore: { not: null },
+    };
+
+    if (jlptLevel) {
+      where.quiz = { jlptLevel };
+    }
+
+    return where;
+  }
+
+  // =============================
   // GLOBAL LEADERBOARD
   // ============================
-  async getGlobalLeaderboard(userId?: string) {
+  async getGlobalLeaderboard(userId?: string, jlptLevel?: string) {
+    const baseWhere = this.buildWhereCondition(jlptLevel);
+    const cacheKey = `leaderboard:global:${jlptLevel || 'all'}:${userId || 'anon'}`;
     return this.buildLeaderboard(
-      userId
-        ? `leaderboard:global:${userId}`
-        : 'leaderboard:global:anon',
-      {
-        completed: true,
-        normalizedScore: { not: null },
-      },
+      cacheKey,
+      baseWhere,
       userId,
     );
   }
@@ -117,13 +128,15 @@ export class LeaderboardService {
   // MODULE LEADERBOARD
   // ============================
   async getModuleLeaderboard(moduleId: string, userId?: string) {
+    const where = {
+      completed: true,
+      normalizedScore: { not: null },
+      quiz: { moduleId },
+    };
+    const cacheKey = `leaderboard:module:${moduleId}:${userId || 'anon'}`;
     return this.buildLeaderboard(
-      `leaderboard:module:${moduleId}:${userId || 'anon'}`,
-      {
-        completed: true,
-        normalizedScore: { not: null },
-        quiz: { moduleId },
-      },
+      cacheKey,
+      where,
       userId,
     );
   }
@@ -131,18 +144,21 @@ export class LeaderboardService {
   // ============================
   // CATEGORY LEADERBOARD
   // ============================
-  async getCategoryLeaderboard(category: string, userId?: string) {
-    return this.buildLeaderboard(
-      `leaderboard:category:${category}:${userId || 'anon'}`,
-      {
-        completed: true,
-        normalizedScore: { not: null },
-        quiz: {
-          module: {
-            categoryType: category as any,
-          },
+  async getCategoryLeaderboard(category: string, userId?: string, jlptLevel?: string) {
+    const baseWhere = this.buildWhereCondition(jlptLevel);
+    const where = {
+      ...baseWhere,
+      quiz: {
+        ...baseWhere.quiz,
+        module: {
+          categoryType: category as any,
         },
       },
+    };
+    const cacheKey = `leaderboard:category:${category}:${jlptLevel || 'all'}:${userId || 'anon'}`;
+    return this.buildLeaderboard(
+      cacheKey,
+      where,
       userId,
     );
   }
@@ -150,10 +166,8 @@ export class LeaderboardService {
   // ============================
   // ALL CATEGORIES COMBINED
   // ============================
-  async getCategorizedLeaderboard(userId?: string) {
-    const cacheKey = userId
-      ? `leaderboard:categorized:${userId}`
-      : 'leaderboard:categorized:anon';
+  async getCategorizedLeaderboard(userId?: string, jlptLevel?: string) {
+    const cacheKey = `leaderboard:categorized:${jlptLevel || 'all'}:${userId || 'anon'}`;
 
     const cached = await this.cache.get(cacheKey);
     if (cached) return cached;
@@ -163,7 +177,7 @@ export class LeaderboardService {
     const result: any = {};
 
     result['Global Program'] =
-      await this.getGlobalLeaderboard(userId);
+      await this.getGlobalLeaderboard(userId, jlptLevel);
 
     for (const category of categories) {
       result[
@@ -172,6 +186,7 @@ export class LeaderboardService {
       ] = await this.getCategoryLeaderboard(
         category,
         userId,
+        jlptLevel,
       );
     }
 
