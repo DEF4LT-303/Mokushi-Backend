@@ -176,12 +176,12 @@ export class LeaderboardService {
 
     const result: any = {};
 
-    result['Global Program'] =
+    result['globalProgram'] =
       await this.getGlobalLeaderboard(userId, jlptLevel);
 
     for (const category of categories) {
       result[
-        category.charAt(0) +
+        category.charAt(0).toLowerCase() +
         category.slice(1).toLowerCase()
       ] = await this.getCategoryLeaderboard(
         category,
