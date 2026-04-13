@@ -1,4 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { Cache } from 'cache-manager';
 import { DatabaseService } from 'src/database/database.service';
 import { CreateUserAnswerDto } from './dto/create-user-answer.dto';
 import { CreateUserAttemptDto } from './dto/create-user-attempt.dto';
@@ -6,7 +8,17 @@ import { UpdateUserAttemptDto } from './dto/update-user-attempt.dto';
 
 @Injectable()
 export class UserAttemptsService {
-  constructor(private readonly databaseService: DatabaseService) { }
+  constructor(
+    private readonly databaseService: DatabaseService,
+    @Inject(CACHE_MANAGER) private cache: Cache
+  ) { }
+
+  private async invalidateLeaderboardCache(moduleId?: string | null) {
+    await this.cache.del('leaderboard:global:avg');
+    if (moduleId) {
+      await this.cache.del(`leaderboard:module:${moduleId}:avg`);
+    }
+  }
 
   async createAttempt(dto: CreateUserAttemptDto) {
     return this.databaseService.userAttempt.create({
@@ -15,10 +27,20 @@ export class UserAttemptsService {
   }
 
   async updateAttempt(id: string, dto: UpdateUserAttemptDto) {
-    return this.databaseService.userAttempt.update({
+    const updatedAttempt = await this.databaseService.userAttempt.update({
       where: { id },
       data: dto,
+      include: {
+        quiz: true,
+      },
     });
+
+    // Invalidate leaderboard cache if score or completed status changed
+    if (dto.score !== undefined || dto.completed !== undefined) {
+      await this.invalidateLeaderboardCache(updatedAttempt.quiz.moduleId);
+    }
+
+    return updatedAttempt;
   }
 
   createUserAnswers(attemptId: string, answers: CreateUserAnswerDto[]) {
@@ -35,10 +57,17 @@ export class UserAttemptsService {
   async calculateScore(userAttemptId: string) {
     const answers = await this.databaseService.userAnswer.findMany({ where: { userAttemptId } });
     const score = answers.filter(ans => ans.correct).length;
-    await this.databaseService.userAttempt.update({
+    const updatedAttempt = await this.databaseService.userAttempt.update({
       where: { id: userAttemptId },
-      data: { score, completed: true }
+      data: { score, completed: true },
+      include: {
+        quiz: true,
+      },
     });
+
+    // Invalidate leaderboard cache since score/completed are updated
+    await this.invalidateLeaderboardCache(updatedAttempt.quiz.moduleId);
+
     return score;
   }
 
@@ -74,10 +103,17 @@ export class UserAttemptsService {
           where: { userAttemptId },
         });
         const expiredScore = existingAnswers.filter(a => a.correct).length;
-        await this.databaseService.userAttempt.update({
+        const updatedAttempt = await this.databaseService.userAttempt.update({
           where: { id: userAttemptId },
           data: { completed: true, score: expiredScore, submittedAt: now },
+          include: {
+            quiz: true,
+          },
         });
+
+        // Invalidate leaderboard cache
+        await this.invalidateLeaderboardCache(updatedAttempt.quiz.moduleId);
+
         throw new NotFoundException('Quiz time limit has expired. Your attempt has been automatically submitted.');
       }
     }
@@ -104,16 +140,44 @@ export class UserAttemptsService {
       };
     });
 
-    await this.databaseService.userAnswer.deleteMany({ where: { userAttemptId } });
-    await this.databaseService.userAnswer.createMany({ data: userAnswersToSave });
-
     const score = userAnswersToSave.filter(a => a.correct).length;
     const submittedAt = new Date();
 
-    await this.databaseService.userAttempt.update({
-      where: { id: userAttemptId },
-      data: { score, completed: true, submittedAt },
+    // Get total questions from quizConfig or actual quiz questions
+    const totalQuestions = allQuizQuestions.length;
+    const normalizedScore = totalQuestions > 0
+      ? parseFloat(((score / totalQuestions) * 100).toFixed(2))
+      : 0;
+
+    const updatedAttempt = await this.databaseService.$transaction(async (tx) => {
+      await tx.userAnswer.deleteMany({ where: { userAttemptId } });
+      await tx.userAnswer.createMany({ data: userAnswersToSave });
+
+      return tx.userAttempt.update({
+        where: { id: userAttemptId },
+        data: { score, normalizedScore, completed: true, submittedAt },
+        include: { quiz: true },
+      });
     });
+
+    await this.invalidateLeaderboardCache(updatedAttempt.quiz.moduleId);
+
+    // const updatedAttempt = await this.databaseService.$transaction(async (tx) => {
+    //   await tx.userAnswer.deleteMany({ where: { userAttemptId } });
+
+    //   await tx.userAnswer.createMany({ data: userAnswersToSave });
+
+    //   return tx.userAttempt.update({
+    //     where: { id: userAttemptId },
+    //     data: { score, completed: true, submittedAt },
+    //     include: {
+    //       quiz: true, // IMPORTANT: we need moduleId
+    //     },
+    //   });
+    // });
+
+    // // 🔥 CACHE INVALIDATION HERE
+    // await this.invalidateLeaderboardCache(updatedAttempt.quiz.moduleId);
 
     // Build detailed results with full question data for all questions
     const results = allQuizQuestions.map((qq) => {
