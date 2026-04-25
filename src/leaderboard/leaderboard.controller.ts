@@ -33,6 +33,7 @@ export class LeaderboardController {
   }
 
   @Get('module/:moduleId/average')
+  @UseGuards(OptionalJwtGuard)
   @ApiOperation({ summary: 'Get module-specific average leaderboard' })
   @ApiParam({
     name: 'moduleId',
@@ -46,7 +47,9 @@ export class LeaderboardController {
   })
   getModuleAverage(
     @Param('moduleId') moduleId: string,
+    @CurrentUser() user?: any,
   ) {
-    return this.leaderboardService.getModuleLeaderboard(moduleId);
+    const userId = user?.id || user?.sub;
+    return this.leaderboardService.getModuleLeaderboard(moduleId, userId);
   }
 }
