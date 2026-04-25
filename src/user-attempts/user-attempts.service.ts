@@ -1,7 +1,6 @@
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { Cache } from 'cache-manager';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from 'src/database/database.service';
+import { LeaderboardService } from 'src/leaderboard/leaderboard.service';
 import { CreateUserAnswerDto } from './dto/create-user-answer.dto';
 import { CreateUserAttemptDto } from './dto/create-user-attempt.dto';
 import { UpdateUserAttemptDto } from './dto/update-user-attempt.dto';
@@ -10,13 +9,12 @@ import { UpdateUserAttemptDto } from './dto/update-user-attempt.dto';
 export class UserAttemptsService {
   constructor(
     private readonly databaseService: DatabaseService,
-    @Inject(CACHE_MANAGER) private cache: Cache
+    private readonly leaderboardService: LeaderboardService,
   ) { }
 
-  private async invalidateLeaderboardCache(moduleId?: string | null) {
-    await this.cache.del('leaderboard:global:avg');
-    if (moduleId) {
-      await this.cache.del(`leaderboard:module:${moduleId}:avg`);
+  private async invalidateLeaderboardCache(userId?: string | null, moduleId?: string | null, jlptLevel?: string) {
+    if (moduleId || jlptLevel) {
+      await this.leaderboardService.onAttemptCompleted(userId, moduleId, jlptLevel);
     }
   }
 
@@ -37,7 +35,7 @@ export class UserAttemptsService {
 
     // Invalidate leaderboard cache if score or completed status changed
     if (dto.score !== undefined || dto.completed !== undefined) {
-      await this.invalidateLeaderboardCache(updatedAttempt.quiz.moduleId);
+      await this.invalidateLeaderboardCache(updatedAttempt.userId, updatedAttempt.quiz.moduleId);
     }
 
     return updatedAttempt;
@@ -66,7 +64,7 @@ export class UserAttemptsService {
     });
 
     // Invalidate leaderboard cache since score/completed are updated
-    await this.invalidateLeaderboardCache(updatedAttempt.quiz.moduleId);
+    await this.invalidateLeaderboardCache(updatedAttempt.userId, updatedAttempt.quiz.moduleId, updatedAttempt.quiz.jlptLevel);
 
     return score;
   }
@@ -111,8 +109,8 @@ export class UserAttemptsService {
           },
         });
 
-        // Invalidate leaderboard cache
-        await this.invalidateLeaderboardCache(updatedAttempt.quiz.moduleId);
+        // Invalidate leaderboard cache and broadcast updates
+        await this.invalidateLeaderboardCache(updatedAttempt.userId, updatedAttempt.quiz.moduleId, updatedAttempt.quiz.jlptLevel);
 
         throw new NotFoundException('Quiz time limit has expired. Your attempt has been automatically submitted.');
       }
@@ -160,7 +158,7 @@ export class UserAttemptsService {
       });
     });
 
-    await this.invalidateLeaderboardCache(updatedAttempt.quiz.moduleId);
+    await this.invalidateLeaderboardCache(updatedAttempt.quiz.moduleId, updatedAttempt.quiz.jlptLevel);
 
     // const updatedAttempt = await this.databaseService.$transaction(async (tx) => {
     //   await tx.userAnswer.deleteMany({ where: { userAttemptId } });
