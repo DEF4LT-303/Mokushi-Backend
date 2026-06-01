@@ -1,7 +1,11 @@
-import { Body, Controller, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBadRequestResponse, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
+import { JwtGuard } from 'src/auth/guards/jwt.guard';
 import { CreateUserAnswerDto } from './dto/create-user-answer.dto';
 import { CreateUserAttemptDto } from './dto/create-user-attempt.dto';
+import { QuizHistoryDetailedDto } from './dto/quiz-history-detailed.dto';
+import { QuizHistoryTableItemDto } from './dto/quiz-history-table-item.dto';
 import { UpdateUserAttemptDto } from './dto/update-user-attempt.dto';
 import { UserAttemptsService } from './user-attempts.service';
 
@@ -49,5 +53,28 @@ export class UserAttemptsController {
   @ApiOkResponse({ description: 'Score calculated and updated' })
   async scoreAttempt(@Param('id') id: string) {
     return { score: await this.userAttemptsService.calculateScore(id) };
+  }
+
+  @Get('history')
+  @UseGuards(JwtGuard)
+  @ApiOperation({ summary: 'Get all quiz history for current user (table view)' })
+  @ApiBearerAuth()
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden' })
+  @ApiOkResponse({ type: [QuizHistoryTableItemDto], description: 'List of quiz attempts' })
+  async getQuizHistory(@CurrentUser() user: any) {
+    const userId = user?.id || user?.sub;
+    return this.userAttemptsService.getQuizHistory(userId);
+  }
+
+  @Get(':id/detail')
+  @UseGuards(JwtGuard)
+  @ApiOperation({ summary: 'Get detailed quiz history for a specific attempt' })
+  @ApiBearerAuth()
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden' })
+  @ApiOkResponse({ type: QuizHistoryDetailedDto, description: 'Detailed quiz history' })
+  async getQuizHistoryDetail(@Param('id') id: string) {
+    return this.userAttemptsService.getQuizHistoryDetail(id);
   }
 }
