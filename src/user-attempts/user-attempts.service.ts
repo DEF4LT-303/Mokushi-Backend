@@ -203,4 +203,121 @@ export class UserAttemptsService {
       results,
     };
   }
+
+  async getQuizHistory(userId: string) {
+    const attempts = await this.databaseService.userAttempt.findMany({
+      where: { userId, completed: true },
+      include: {
+        quiz: {
+          select: {
+            id: true,
+            module: {
+              select: { categoryType: true },
+            },
+          },
+        },
+      },
+      orderBy: { submittedAt: 'desc' },
+    });
+
+    const quizIds = [...new Set(attempts.map(a => a.quizId))];
+
+    const questionCounts = await this.databaseService.quizQuestion.groupBy({
+      by: ['quizId'],
+      where: { quizId: { in: quizIds } },
+      _count: { _all: true },
+    });
+
+    const countMap = new Map(
+      questionCounts.map(q => [q.quizId, q._count._all]),
+    );
+
+    return attempts.map(attempt => {
+      const totalQuestions = countMap.get(attempt.quizId) ?? 0;
+
+      const timeTaken = attempt.submittedAt
+        ? Math.round(
+          (attempt.submittedAt.getTime() - attempt.startedAt.getTime()) / 1000,
+        )
+        : 0;
+
+      return {
+        id: attempt.id,
+        category: attempt.quiz.module?.categoryType ?? 'UNKNOWN',
+        date:
+          attempt.submittedAt?.toISOString() ??
+          attempt.startedAt.toISOString(),
+        score: attempt.score,
+        totalQuestions,
+        timeTaken,
+        passed: totalQuestions > 0 ? attempt.score / totalQuestions >= 0.6 : false,
+      };
+    });
+  }
+
+  async getQuizHistoryDetail(userAttemptId: string) {
+    const attempt = await this.databaseService.userAttempt.findUnique({
+      where: { id: userAttemptId },
+      include: {
+        quiz: {
+          include: {
+            module: true,
+            quizConfig: true,
+          },
+        },
+        userAnswers: {
+          include: {
+            quizQuestion: {
+              include: {
+                question: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!attempt) {
+      throw new NotFoundException(`User attempt with id '${userAttemptId}' not found`);
+    }
+
+    if (!attempt.completed) {
+      throw new NotFoundException('This quiz attempt has not been completed yet');
+    }
+
+    const timeTaken = attempt.submittedAt
+      ? Math.round((attempt.submittedAt.getTime() - attempt.startedAt.getTime()) / 1000)
+      : 0;
+
+    const totalQuestions = await this.databaseService.quizQuestion.count({
+      where: { quizId: attempt.quizId },
+    });
+
+    // Build results with detailed question info
+    const results = attempt.userAnswers.map(ua => ({
+      quizQuestionId: ua.quizQuestionId,
+      question: {
+        id: ua.quizQuestion.question.id,
+        content: ua.quizQuestion.question.content,
+        options: ua.quizQuestion.question.options,
+        correctAnswer: ua.quizQuestion.question.correctAnswer,
+        explanation: ua.quizQuestion.question.explanation,
+        questionType: ua.quizQuestion.question.questionType,
+      },
+      userAnswer: ua.answer || null,
+      correctAnswer: ua.quizQuestion.question.correctAnswer,
+      isCorrect: ua.correct,
+    }));
+
+    return {
+      success: true,
+      submission: {
+        quizDate: attempt.submittedAt || attempt.startedAt,
+        score: attempt.score,
+        totalQuestions,
+        timeTaken,
+        results,
+      },
+    };
+  }
 }
