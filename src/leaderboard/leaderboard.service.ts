@@ -1,13 +1,18 @@
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Inject, Injectable } from '@nestjs/common';
-import { Cache } from 'cache-manager';
+import { forwardRef, Inject, Injectable, Logger } from '@nestjs/common';
+import { CacheService } from 'src/common/services/cache.service';
 import { DatabaseService } from 'src/database/database.service';
+import { LeaderboardGateway } from './leaderboard.gateway';
 
 @Injectable()
 export class LeaderboardService {
+  private logger = new Logger('LeaderboardService');
+
   constructor(
     private readonly databaseService: DatabaseService,
-    @Inject(CACHE_MANAGER) private cache: Cache,
+    private readonly cache: CacheService,
+
+    @Inject(forwardRef(() => LeaderboardGateway))
+    private readonly gateway: LeaderboardGateway,
   ) { }
 
   // ============================
@@ -193,4 +198,26 @@ export class LeaderboardService {
     await this.cache.set(cacheKey, result, 60);
     return result;
   }
+
+  // ============================
+  // CACHE INVALIDATION & BROADCAST
+  // ============================
+
+  /**
+   * Call this after a quiz attempt is submitted to invalidate cache
+   * and broadcast updates to all connected clients
+   */
+  async onAttemptCompleted(userId?: string | null, moduleId?: string | null, jlptLevel?: string) {
+    await this.cache.invalidatePattern(`leaderboard:`);
+
+    try {
+      const leaderboard =
+        await this.getCategorizedLeaderboard(userId || undefined, jlptLevel);
+
+      this.gateway.broadcastUpdate();
+    } catch (error) {
+      this.logger.error(`Broadcast error: ${error}`);
+    }
+  }
+
 }
