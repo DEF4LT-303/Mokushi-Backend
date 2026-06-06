@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
-import { ApiBadRequestResponse, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { ApiBadRequestResponse, ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiForbiddenResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
 import { JwtGuard } from 'src/auth/guards/jwt.guard';
 import { CreateUserAnswerDto } from './dto/create-user-answer.dto';
@@ -57,14 +57,24 @@ export class UserAttemptsController {
 
   @Get('history')
   @UseGuards(JwtGuard)
-  @ApiOperation({ summary: 'Get all quiz history for current user (table view)' })
+  @ApiOperation({ summary: 'Get quiz history for current user with pagination and category filtering' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of records to fetch', example: 20 })
+  @ApiQuery({ name: 'skip', required: false, type: Number, description: 'Number of records to skip for pagination', example: 0 })
+  @ApiQuery({ name: 'categoryType', required: false, enum: ['GRAMMAR', 'VOCABULARY', 'LISTENING'] })
   @ApiBearerAuth()
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiForbiddenResponse({ description: 'Forbidden' })
   @ApiOkResponse({ type: [QuizHistoryTableItemDto], description: 'List of quiz attempts' })
-  async getQuizHistory(@CurrentUser() user: any) {
+  async getQuizHistory(
+    @CurrentUser() user: any,
+    @Query('limit') limit?: string,
+    @Query('skip') skip?: string,
+    @Query('categoryType') categoryType?: string,
+  ) {
     const userId = user?.id || user?.sub;
-    return this.userAttemptsService.getQuizHistory(userId);
+    const limitNum = limit ? Math.min(Math.max(parseInt(limit, 10), 1), 100) : undefined;
+    const offsetNum = skip ? Math.max(parseInt(skip, 10), 0) : undefined;
+    return this.userAttemptsService.getQuizHistory(userId, limitNum, offsetNum, categoryType);
   }
 
   @Get(':id/detail')

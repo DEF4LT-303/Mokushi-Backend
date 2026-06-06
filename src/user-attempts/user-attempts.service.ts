@@ -204,9 +204,22 @@ export class UserAttemptsService {
     };
   }
 
-  async getQuizHistory(userId: string) {
-    const attempts = await this.databaseService.userAttempt.findMany({
-      where: { userId, completed: true },
+  async getQuizHistory(userId: string, limit?: number, offset?: number, categoryType?: string) {
+    const whereClause: any = {
+      userId,
+      completed: true,
+    };
+
+    if (categoryType) {
+      whereClause.quiz = {
+        module: {
+          categoryType,
+        },
+      };
+    }
+
+    const queryOptions: any = {
+      where: whereClause,
       include: {
         quiz: {
           select: {
@@ -218,7 +231,21 @@ export class UserAttemptsService {
         },
       },
       orderBy: { submittedAt: 'desc' },
+    };
+
+    if (limit !== undefined) {
+      queryOptions.take = limit;
+    }
+    if (offset !== undefined) {
+      queryOptions.skip = offset;
+    }
+
+    // Get total count
+    const totalCount = await this.databaseService.userAttempt.count({
+      where: whereClause,
     });
+
+    const attempts = await this.databaseService.userAttempt.findMany(queryOptions) as any[];
 
     const quizIds = [...new Set(attempts.map(a => a.quizId))];
 
@@ -232,7 +259,7 @@ export class UserAttemptsService {
       questionCounts.map(q => [q.quizId, q._count._all]),
     );
 
-    return attempts.map(attempt => {
+    const data = attempts.map(attempt => {
       const totalQuestions = countMap.get(attempt.quizId) ?? 0;
 
       const timeTaken = attempt.submittedAt
@@ -253,6 +280,11 @@ export class UserAttemptsService {
         passed: totalQuestions > 0 ? attempt.score / totalQuestions >= 0.6 : false,
       };
     });
+
+    return {
+      total: totalCount,
+      data,
+    };
   }
 
   async getQuizHistoryDetail(userAttemptId: string) {
