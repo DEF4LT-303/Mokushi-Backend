@@ -129,25 +129,21 @@ export class ModuleService {
   }
 
   async getQuizByModule(id: string, quizConfigId: string) {
-    const module = await this.databaseService.module.findUnique({ where: { id } });
-    if (!module) {
-      throw new NotFoundException(`Module with id '${id}' not found`);
-    }
+    const [module, quizConfig] = await Promise.all([
+      this.databaseService.module.findUnique({ where: { id } }),
+      this.databaseService.quizConfig.findUnique({ where: { id: quizConfigId } }),
+    ]);
 
-    // Fetch the quiz configuration
-    const quizConfig = await this.databaseService.quizConfig.findUnique({
-      where: { id: quizConfigId },
-    });
-
+    if (!module) throw new NotFoundException(`Module with id '${id}' not found`);
     if (!quizConfig || quizConfig.moduleId !== id) {
       throw new NotFoundException(`Quiz config with id '${quizConfigId}' not found for this module`);
     }
 
     const moduleQuestions = await this.databaseService.question.findMany({
       where: { moduleId: id },
+      select: { id: true },
     });
 
-    // Shuffle and pick numQuestions random questions based on config
     const shuffled = moduleQuestions.sort(() => 0.5 - Math.random());
     const selectedQuestions = shuffled.slice(0, quizConfig.numQuestions);
 
@@ -157,28 +153,22 @@ export class ModuleService {
         jlptLevel: module.jlptLevel,
         moduleId: module.id,
         quizConfigId: quizConfig.id,
-      }
-    });
-
-    for (let i = 0; i < selectedQuestions.length; i++) {
-      await this.databaseService.quizQuestion.create({
-        data: {
-          quizId: quiz.id,
-          questionId: selectedQuestions[i].id,
-          order: i + 1,
-        }
-      });
-    }
-
-    const quizWithQuestions = await this.databaseService.quiz.findUnique({
-      where: { id: quiz.id },
+        questions: {
+          createMany: {
+            data: selectedQuestions.map((q, i) => ({
+              questionId: q.id,
+              order: i + 1,
+            })),
+          },
+        },
+      },
       include: {
         questions: {
           orderBy: { order: 'asc' },
-          include: { question: true }
+          include: { question: true },
         },
         quizConfig: true,
-      }
+      },
     });
 
     return {
@@ -191,10 +181,10 @@ export class ModuleService {
         categoryType: module.categoryType,
       },
       quiz: {
-        id: quizWithQuestions!.id,
-        title: quizWithQuestions!.title,
-        jlptLevel: quizWithQuestions!.jlptLevel,
-        questionCount: quizWithQuestions!.questions.length,
+        id: quiz.id,
+        title: quiz.title,
+        jlptLevel: quiz.jlptLevel,
+        questionCount: quiz.questions.length,
         durationSec: quizConfig.durationSec,
         quizConfig: {
           id: quizConfig.id,
@@ -202,7 +192,7 @@ export class ModuleService {
           numQuestions: quizConfig.numQuestions,
           durationSec: quizConfig.durationSec,
         },
-        questions: quizWithQuestions!.questions.map((qq) => ({
+        questions: quiz.questions.map((qq) => ({
           quizQuestionId: qq.id,
           questionId: qq.question.id,
           order: qq.order,
