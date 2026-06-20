@@ -1,8 +1,11 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { JwtGuard } from './jwt.guard';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { SafeUser } from 'prisma/safe-user.select';
 import { isAdmin } from 'src/common/utils/role.helpers';
+import { JwtGuard } from './jwt.guard';
 
+/**
+ * Requires JWT token and admin role. Convenience guard combining JwtGuard + admin check.
+ */
 @Injectable()
 export class AdminGuard extends JwtGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
