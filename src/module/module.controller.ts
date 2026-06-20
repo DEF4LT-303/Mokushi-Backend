@@ -97,6 +97,38 @@ export class ModuleController {
     return this.moduleService.createQuizConfig(moduleId, createQuizConfigDto);
   }
 
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Patch(':id/quiz-configs/:configId')
+  @ApiOperation({ summary: 'Update a quiz configuration' })
+  @ApiOkResponse({ description: 'Quiz configuration updated successfully' })
+  @ApiBody({ type: CreateQuizConfigDto })
+  @ApiBearerAuth()
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden' })
+  @ApiNotFoundResponse({ description: 'Quiz config not found' })
+  async updateQuizConfig(
+    @Param('configId') configId: string,
+    @Body() dto: CreateQuizConfigDto
+  ) {
+    return this.moduleService.updateQuizConfig(configId, dto);
+  }
+
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @Delete(':id/quiz-configs/:configId')
+  @ApiOperation({ summary: 'Delete a quiz configuration' })
+  @ApiOkResponse({ description: 'Quiz configuration deleted successfully' })
+  @ApiBearerAuth()
+  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
+  @ApiForbiddenResponse({ description: 'Forbidden' })
+  @ApiNotFoundResponse({ description: 'Quiz config not found' })
+  async deleteQuizConfig(
+    @Param('configId') configId: string,
+  ) {
+    return this.moduleService.deleteQuizConfig(configId);
+  }
+
   @UseGuards(JwtGuard)
   @Get(':id/quiz')
   @ApiOperation({ summary: 'Start a quiz for a module with selected configuration (creates a UserAttempt automatically)' })

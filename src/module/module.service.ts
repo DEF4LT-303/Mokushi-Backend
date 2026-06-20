@@ -112,6 +112,7 @@ export class ModuleService {
     return this.databaseService.module.delete({ where: { id } });
   }
 
+  // * Quiz config management
   async getQuizConfigsByModule(moduleId: string) {
     return this.databaseService.quizConfig.findMany({
       where: { moduleId },
@@ -127,6 +128,36 @@ export class ModuleService {
       },
     });
   }
+
+  async updateQuizConfig(configId: string, dto: { name: string; numQuestions: number; durationSec: number }) {
+    const existing = await this.databaseService.quizConfig.findFirst({
+      where: { id: configId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`Quiz config '${configId}' not found`);
+    }
+
+    return this.databaseService.quizConfig.update({
+      where: { id: configId },
+      data: dto,
+    });
+  }
+
+  async deleteQuizConfig(configId: string) {
+    const existing = await this.databaseService.quizConfig.findFirst({
+      where: { id: configId },
+    });
+
+    if (!existing) {
+      throw new NotFoundException(`Quiz config '${configId}' not found`);
+    }
+
+    return this.databaseService.quizConfig.delete({
+      where: { id: configId },
+    });
+  }
+  // * Quiz config management
 
   async getQuizByModule(id: string, quizConfigId: string) {
     const [module, quizConfig] = await Promise.all([
