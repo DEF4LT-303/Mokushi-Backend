@@ -19,6 +19,6 @@ export class QuizHistoryTableItemDto {
   @ApiProperty({ description: 'Time taken in seconds' })
   timeTaken!: number;
 
-  @ApiProperty({ description: 'Whether the quiz was passed (score/totalQuestions >= 0.6)' })
-  passed!: boolean;
+  @ApiProperty({ description: 'Performance label based on score', enum: ['EXCELLENT', 'GOOD', 'AVERAGE', 'NEEDS WORK', 'N/A'] })
+  performance!: string;
 }

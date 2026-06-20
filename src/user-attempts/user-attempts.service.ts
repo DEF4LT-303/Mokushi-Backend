@@ -204,6 +204,14 @@ export class UserAttemptsService {
     };
   }
 
+  private getPerformanceLabel(score: number, totalQuestions: number): string {
+    if (totalQuestions === 0) return 'N/A';
+    const pct = (score / totalQuestions) * 100;
+    if (pct >= 70) return 'EXCELLENT';
+    if (pct >= 40) return 'GOOD';
+    return 'POOR';
+  }
+
   async getQuizHistory(userId: string, limit?: number, offset?: number, categoryType?: string) {
     const whereClause: any = {
       userId,
@@ -277,7 +285,7 @@ export class UserAttemptsService {
         score: attempt.score,
         totalQuestions,
         timeTaken,
-        passed: totalQuestions > 0 ? attempt.score / totalQuestions >= 0.6 : false,
+        performance: this.getPerformanceLabel(attempt.score, totalQuestions),
       };
     });
 
