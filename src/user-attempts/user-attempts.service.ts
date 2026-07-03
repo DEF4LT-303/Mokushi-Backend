@@ -7,6 +7,13 @@ import { UpdateUserAttemptDto } from './dto/update-user-attempt.dto';
 
 @Injectable()
 export class UserAttemptsService {
+  private readonly submissionGracePeriodMs = (() => {
+    const envValue = process.env.QUIZ_GRACE_PERDIOD;
+    if (!envValue) return 10_000;
+    const parsed = parseInt(envValue.replace(/_/g, ''), 10);
+    return Number.isNaN(parsed) ? 10_000 : parsed;
+  })();
+
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly leaderboardService: LeaderboardService,
@@ -87,12 +94,25 @@ export class UserAttemptsService {
     }
 
     if (attempt.completed) {
-      throw new NotFoundException('This quiz attempt has already been submitted');
+      const existingAnswers = await this.databaseService.userAnswer.findMany({
+        where: { userAttemptId },
+      });
+      const completedScore = existingAnswers.filter(a => a.correct).length;
+      const totalQuestions = await this.databaseService.quizQuestion.count({
+        where: { quizId: attempt.quizId },
+      });
+
+      return {
+        alreadySubmitted: true,
+        score: completedScore,
+        totalQuestions,
+        results: [],
+      };
     }
 
     // Check if time limit has expired
     if (attempt.quiz.quizConfig) {
-      const deadline = new Date(attempt.startedAt.getTime() + attempt.quiz.quizConfig.durationSec * 1000);
+      const deadline = new Date(attempt.startedAt.getTime() + attempt.quiz.quizConfig.durationSec * 1000 + this.submissionGracePeriodMs);
       const now = new Date();
 
       if (now > deadline) {
