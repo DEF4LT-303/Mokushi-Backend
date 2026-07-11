@@ -6,6 +6,7 @@ import { AuthModule } from './auth/auth.module';
 import { AuthMiddleware } from './auth/middleware/auth.middleware';
 import { DatabaseModule } from './database/database.module';
 import { LeaderboardModule } from './leaderboard/leaderboard.module';
+import { LessonsModule } from './lessons/lessons.module';
 import { ModuleModule } from './module/module.module';
 import { QuestionsModule } from './questions/questions.module';
 import { UserAttemptsModule } from './user-attempts/user-attempts.module';
@@ -17,6 +18,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     UsersModule,
     ModuleModule,
+    LessonsModule,
     QuestionsModule,
     UserAttemptsModule,
     JwtModule.register({

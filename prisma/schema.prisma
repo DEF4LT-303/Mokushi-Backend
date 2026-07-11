@@ -62,17 +62,6 @@ enum CategoryType {
   LISTENING
 }
 
-model Rule {
-  id    String @id @default(uuid())
-  name  String @unique
-  rules Json?
-
-  modules Module[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
 model Module {
   id                 String       @id @default(uuid())
   slug               String       @unique
@@ -87,13 +76,63 @@ model Module {
   quizzes            Quiz[]
   quizConfigs        QuizConfig[]
 
-  ruleId String?
-  rules  Rule?   @relation(fields: [ruleId], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lessons   Lesson[]
+
+  @@index([slug])
+}
+
+model Lesson {
+  id           String @id @default(uuid())
+  title        String
+  lessonNumber Int
+
+  moduleId String
+  module   Module @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  grammarRules GrammarRule[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([slug])
+  @@index([moduleId])
+}
+
+model GrammarRule {
+  id String @id @default(uuid())
+
+  japanese     String
+  romaji       String?
+  englishTitle String
+  description  String
+
+  structurePattern String?
+  usageNotes       String?
+
+  lessonId String
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  examples GrammarExample[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([lessonId])
+}
+
+model GrammarExample {
+  id String @id @default(uuid())
+
+  japaneseSentence   String
+  englishTranslation String
+
+  grammarRuleId String
+  grammarRule   GrammarRule @relation(fields: [grammarRuleId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([grammarRuleId])
 }
 
 enum QuestionType {
