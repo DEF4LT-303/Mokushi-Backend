@@ -58,28 +58,19 @@ export class ModuleController {
     });
   }
 
+  @Get('rules')
+  @ApiOperation({ summary: 'Get all rules' })
+  @ApiOkResponse({ description: 'List of all rules' })
+  async fetchAllModuleRules() {
+    return this.moduleService.fetchAllModuleRules();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get a module by ID' })
   @ApiOkResponse({ description: 'Module fetched successfully' })
   @ApiNotFoundResponse({ description: 'Module not found' })
   findOne(@Param('id') id: string) {
     return this.moduleService.findOne(id);
-  }
-
-  @Get(':id/rules')
-  @ApiOperation({ summary: 'Get all rules for a module' })
-  @ApiOkResponse({ description: 'List of module rules' })
-  @ApiNotFoundResponse({ description: 'Module not found' })
-  getModuleRules(@Param('id') id: string) {
-    return this.moduleService.getModuleRules(id);
-  }
-
-  @Get('rules/:ruleId')
-  @ApiOperation({ summary: 'Get a module rule by ID' })
-  @ApiOkResponse({ description: 'Module rule fetched successfully' })
-  @ApiNotFoundResponse({ description: 'Rule not found' })
-  getModuleRuleById(@Param('ruleId') ruleId: string) {
-    return this.moduleService.getModuleRuleById(ruleId);
   }
 
   @Get(':id/quiz-configs')
