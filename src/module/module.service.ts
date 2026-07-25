@@ -239,6 +239,39 @@ export class ModuleService {
     };
   }
 
+  async getModuleRules(moduleId: string) {
+    const module = await this.databaseService.module.findUnique({ where: { id: moduleId } });
+
+    if (!module) {
+      throw new NotFoundException(`Module with id '${moduleId}' not found`);
+    }
+
+    return this.databaseService.rule.findMany({
+      where: {
+        modules: {
+          some: {
+            id: moduleId,
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+      include: { modules: true },
+    });
+  }
+
+  async getModuleRuleById(ruleId: string) {
+    const rule = await this.databaseService.rule.findUnique({
+      where: { id: ruleId },
+      include: { modules: true },
+    });
+
+    if (!rule) {
+      throw new NotFoundException(`Rule with id '${ruleId}' not found`);
+    }
+
+    return rule;
+  }
+
   async getLessonsByModule(moduleId: string) {
     const module = await this.databaseService.module.findUnique({ where: { id: moduleId } });
 
