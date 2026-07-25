@@ -66,6 +66,22 @@ export class ModuleController {
     return this.moduleService.findOne(id);
   }
 
+  @Get(':id/rules')
+  @ApiOperation({ summary: 'Get all rules for a module' })
+  @ApiOkResponse({ description: 'List of module rules' })
+  @ApiNotFoundResponse({ description: 'Module not found' })
+  getModuleRules(@Param('id') id: string) {
+    return this.moduleService.getModuleRules(id);
+  }
+
+  @Get('rules/:ruleId')
+  @ApiOperation({ summary: 'Get a module rule by ID' })
+  @ApiOkResponse({ description: 'Module rule fetched successfully' })
+  @ApiNotFoundResponse({ description: 'Rule not found' })
+  getModuleRuleById(@Param('ruleId') ruleId: string) {
+    return this.moduleService.getModuleRuleById(ruleId);
+  }
+
   @Get(':id/quiz-configs')
   @ApiOperation({ summary: 'Get all available quiz configurations for a module' })
   @ApiOkResponse({ description: 'List of quiz configurations' })
@@ -168,7 +184,6 @@ export class ModuleController {
     @CurrentUser() user: any,
     @Body(ValidationPipe) body: SubmitQuizDto
   ) {
-    // (Optionally: verify attempt belongs to this user)
     const submission = await this.userAttemptsService.submitQuizAnswers(body.userAttemptId, body.answers);
     return { success: true, submission };
   }
