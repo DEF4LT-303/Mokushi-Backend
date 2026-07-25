@@ -24,6 +24,7 @@ async function main() {
   let questions: any[] = [];
   let quizzes: any[] = [];
   let attempts: any[] = [];
+  let ruleModels: any[] = [];
 
   // Create users
   if (shouldRun('users')) {
@@ -40,6 +41,13 @@ async function main() {
     lessons = seededContent.lessons;
     grammarRules = seededContent.grammarRules;
     console.log(`📘 Created ${lessons.length} lessons and ${grammarRules.length} grammar rules`);
+  }
+
+  // Create module rule models
+  if (shouldRun('rule-models')) {
+    const modulesToSeed = modules.length ? modules : await prisma.module.findMany({ take: 5, orderBy: { createdAt: 'asc' } });
+    const seededRules = await createRuleModels(modulesToSeed);
+    console.log(`📗 Created ${seededRules.length} module rule records`);
   }
 
   // Create modules
@@ -394,6 +402,85 @@ async function createModules() {
   }
 
   return modules;
+}
+
+async function createRuleModels(modules: any[]) {
+  const ruleSeedNames = [
+    'N5 Vocabulary Rule Set',
+    'N5 Kanji Rule Set',
+    'N5 Listening Rule Set',
+    'N5 Grammar Pattern Rule',
+    'N5 Sentence Structure Rule',
+  ];
+
+  await prisma.rule.deleteMany({ where: { name: { in: ruleSeedNames } } });
+
+  const ruleSeeds = [
+    {
+      name: 'N5 Vocabulary Rule Set',
+      rules: [
+        'Use core JLPT N5 vocabulary to create vocabulary practice exercises.',
+        'Vocabulary category: VOCABULARY',
+        'Example words: たべもの, のみもの, いえ, てんき',
+      ],
+      moduleSlug: 'n5-basic-vocabulary',
+    },
+    {
+      name: 'N5 Kanji Rule Set',
+      rules: [
+        'Focus on basic N5 kanji reading and meaning rules.',
+        'Kanji category: KANJI',
+        'Example kanji: 人, 大, 小, 山, 川',
+      ],
+      moduleSlug: 'n5-basic-kanji',
+    },
+    {
+      name: 'N5 Listening Rule Set',
+      rules: [
+        'Generate listening prompts and comprehension checks for N5 learners.',
+        'Listening category: LISTENING',
+        'Audio hints: short dialog, simple question, basic instruction',
+      ],
+      moduleSlug: 'n5-listening-basics',
+    },
+    {
+      name: 'N5 Grammar Pattern Rule',
+      rules: [
+        'Create grammar questions using common N5 sentence patterns.',
+        'Patterns: は, も, の, これ/それ/あれ',
+        'Difficulty: beginner',
+      ],
+      moduleSlug: 'n5-basic-vocabulary',
+    },
+    {
+      name: 'N5 Sentence Structure Rule',
+      rules: [
+        'Use simple subject-predicate sentence structures for N5 practice.',
+        'Patterns: [Topic] は [Predicate], [Noun] の [Noun]',
+      ],
+      moduleSlug: 'n5-basic-vocabulary',
+    },
+  ];
+
+  const createdRules: any[] = [];
+  const moduleMap = modules.reduce((map: Record<string, any>, module: any) => {
+    map[module.slug] = module;
+    return map;
+  }, {} as Record<string, any>);
+
+  for (const seed of ruleSeeds) {
+    const module = moduleMap[seed.moduleSlug];
+    const rule = await prisma.rule.create({
+      data: {
+        name: seed.name,
+        rules: seed.rules,
+        ...(module ? { modules: { connect: { id: module.id } } } : {}),
+      },
+    });
+    createdRules.push(rule);
+  }
+
+  return createdRules;
 }
 
 async function createQuestions(modules: any[]) {

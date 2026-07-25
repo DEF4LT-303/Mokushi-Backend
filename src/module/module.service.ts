@@ -239,37 +239,24 @@ export class ModuleService {
     };
   }
 
-  async getModuleRules(moduleId: string) {
-    const module = await this.databaseService.module.findUnique({ where: { id: moduleId } });
+  async fetchAllModuleRules() {
+    try {
+      const rules = await this.databaseService.rule.findMany({
+        orderBy: { createdAt: 'asc' },
+      });
 
-    if (!module) {
-      throw new NotFoundException(`Module with id '${moduleId}' not found`);
+      if (!rules || rules.length === 0) {
+        throw new NotFoundException('No rules found');
+      }
+
+      return rules.map(rule => ({
+        id: rule.id,
+        name: rule.name,
+        rules: rule.rules,
+      }));
+    } catch (error) {
+      throw new Error(`Failed to fetch rules: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
-
-    return this.databaseService.rule.findMany({
-      where: {
-        modules: {
-          some: {
-            id: moduleId,
-          },
-        },
-      },
-      orderBy: { name: 'asc' },
-      include: { modules: true },
-    });
-  }
-
-  async getModuleRuleById(ruleId: string) {
-    const rule = await this.databaseService.rule.findUnique({
-      where: { id: ruleId },
-      include: { modules: true },
-    });
-
-    if (!rule) {
-      throw new NotFoundException(`Rule with id '${ruleId}' not found`);
-    }
-
-    return rule;
   }
 
   async getLessonsByModule(moduleId: string) {
