@@ -106,6 +106,7 @@ export class UserAttemptsService {
         alreadySubmitted: true,
         score: completedScore,
         totalQuestions,
+        timeTaken: this.getTimeTakenSeconds(attempt.startedAt, attempt.submittedAt),
         results: [],
       };
     }
@@ -180,23 +181,6 @@ export class UserAttemptsService {
 
     await this.invalidateLeaderboardCache(updatedAttempt.quiz.moduleId, updatedAttempt.quiz.jlptLevel);
 
-    // const updatedAttempt = await this.databaseService.$transaction(async (tx) => {
-    //   await tx.userAnswer.deleteMany({ where: { userAttemptId } });
-
-    //   await tx.userAnswer.createMany({ data: userAnswersToSave });
-
-    //   return tx.userAttempt.update({
-    //     where: { id: userAttemptId },
-    //     data: { score, completed: true, submittedAt },
-    //     include: {
-    //       quiz: true, // IMPORTANT: we need moduleId
-    //     },
-    //   });
-    // });
-
-    // // 🔥 CACHE INVALIDATION HERE
-    // await this.invalidateLeaderboardCache(updatedAttempt.quiz.moduleId);
-
     // Build detailed results with full question data for all questions
     const results = allQuizQuestions.map((qq) => {
       const userAnswer = answersMap.get(qq.id);
@@ -220,8 +204,17 @@ export class UserAttemptsService {
     return {
       score,
       totalQuestions: results.length,
+      timeTaken: this.getTimeTakenSeconds(attempt.startedAt, submittedAt),
       results,
     };
+  }
+
+  private getTimeTakenSeconds(startedAt: Date, submittedAt?: Date | null): number {
+    if (!submittedAt) {
+      return 0;
+    }
+
+    return Math.round((submittedAt.getTime() - startedAt.getTime()) / 1000);
   }
 
   private getPerformanceLabel(score: number, totalQuestions: number): string {
@@ -290,12 +283,6 @@ export class UserAttemptsService {
     const data = attempts.map(attempt => {
       const totalQuestions = countMap.get(attempt.quizId) ?? 0;
 
-      const timeTaken = attempt.submittedAt
-        ? Math.round(
-          (attempt.submittedAt.getTime() - attempt.startedAt.getTime()) / 1000,
-        )
-        : 0;
-
       return {
         id: attempt.id,
         category: attempt.quiz.module?.categoryType ?? 'UNKNOWN',
@@ -304,7 +291,7 @@ export class UserAttemptsService {
           attempt.startedAt.toISOString(),
         score: attempt.score,
         totalQuestions,
-        timeTaken,
+        timeTaken: this.getTimeTakenSeconds(attempt.startedAt, attempt.submittedAt),
         performance: this.getPerformanceLabel(attempt.score, totalQuestions),
       };
     });
@@ -345,10 +332,6 @@ export class UserAttemptsService {
       throw new NotFoundException('This quiz attempt has not been completed yet');
     }
 
-    const timeTaken = attempt.submittedAt
-      ? Math.round((attempt.submittedAt.getTime() - attempt.startedAt.getTime()) / 1000)
-      : 0;
-
     const totalQuestions = await this.databaseService.quizQuestion.count({
       where: { quizId: attempt.quizId },
     });
@@ -375,7 +358,7 @@ export class UserAttemptsService {
         quizDate: attempt.submittedAt || attempt.startedAt,
         score: attempt.score,
         totalQuestions,
-        timeTaken,
+        timeTaken: this.getTimeTakenSeconds(attempt.startedAt, attempt.submittedAt),
         results,
       },
     };
