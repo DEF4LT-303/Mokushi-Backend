@@ -61,8 +61,8 @@ export class ModuleController {
   @Get('rules')
   @ApiOperation({ summary: 'Get all rules' })
   @ApiOkResponse({ description: 'List of all rules' })
-  async fetchAllRules() {
-    return this.moduleService.fetchAllRules();
+  async fetchAllModuleRules() {
+    return this.moduleService.fetchAllModuleRules();
   }
 
   @Get(':id')
@@ -175,7 +175,6 @@ export class ModuleController {
     @CurrentUser() user: any,
     @Body(ValidationPipe) body: SubmitQuizDto
   ) {
-    // (Optionally: verify attempt belongs to this user)
     const submission = await this.userAttemptsService.submitQuizAnswers(body.userAttemptId, body.answers);
     return { success: true, submission };
   }

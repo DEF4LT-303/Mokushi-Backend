@@ -18,11 +18,13 @@ async function main() {
   console.log('🧹 No global deletion. Running targeted cleanup per requested seed(s)');
   // Variables to hold created data (so dependent seeders can run even if some skipped)
   let users: any[] = [];
-  let rules: any[] = [];
+  let lessons: any[] = [];
+  let grammarRules: any[] = [];
   let modules: any[] = [];
   let questions: any[] = [];
   let quizzes: any[] = [];
   let attempts: any[] = [];
+  let ruleModels: any[] = [];
 
   // Create users
   if (shouldRun('users')) {
@@ -32,12 +34,20 @@ async function main() {
     console.log(`👥 Created ${users.length} users`);
   }
 
-  // Create rules
+  // Create lessons and grammar rules
   if (shouldRun('rules')) {
-    // Remove previous seed rules
-    await prisma.rule.deleteMany({ where: { name: { in: ['Grammar Rules', 'Vocabulary Rules', 'Listening Rules'] } } });
-    rules = await createRules();
-    console.log(`📜 Created ${rules.length} rules`);
+    const modulesToSeed = modules.length ? modules : await prisma.module.findMany({ take: 5, orderBy: { createdAt: 'asc' } });
+    const seededContent = await createLessonsAndGrammarRules(modulesToSeed);
+    lessons = seededContent.lessons;
+    grammarRules = seededContent.grammarRules;
+    console.log(`📘 Created ${lessons.length} lessons and ${grammarRules.length} grammar rules`);
+  }
+
+  // Create module rule models
+  if (shouldRun('rule-models')) {
+    const modulesToSeed = modules.length ? modules : await prisma.module.findMany({ take: 5, orderBy: { createdAt: 'asc' } });
+    const seededRules = await createRuleModels(modulesToSeed);
+    console.log(`📗 Created ${seededRules.length} module rule records`);
   }
 
   // Create modules
@@ -46,6 +56,11 @@ async function main() {
     await prisma.module.deleteMany({ where: { slug: { in: ['n5-hiragana-reading', 'n5-katakana-reading', 'n5-basic-vocabulary', 'n5-listening-basics', 'n5-basic-kanji'] } } });
     modules = await createModules();
     console.log(`📚 Created ${modules.length} modules`);
+
+    const seededContent = await createLessonsAndGrammarRules(modules);
+    lessons = seededContent.lessons;
+    grammarRules = seededContent.grammarRules;
+    console.log(`📘 Created ${lessons.length} lessons and ${grammarRules.length} grammar rules`);
   }
 
   // Create questions
@@ -143,47 +158,129 @@ async function createUsers() {
   return users;
 }
 
-async function createRules() {
-  const rulesData = [
+async function createLessonsAndGrammarRules(modules: any[]) {
+  const module = modules[0];
+  if (!module) {
+    return { lessons: [], grammarRules: [] };
+  }
+
+  const moduleIds = modules.map((m: any) => m.id);
+  await prisma.grammarRule.deleteMany({
+    where: { lesson: { moduleId: { in: moduleIds } } },
+  });
+  await prisma.lesson.deleteMany({ where: { moduleId: { in: moduleIds } } });
+
+  const lessonSeeds = [
     {
-      name: 'Grammar Rules',
-      rules: {
-        items: [
-          'Use particles correctly (は/が/を/に)',
-          'Conjugate verbs according to tense and politeness',
-          'Keep proper word order (Subject-Object-Verb)'
-        ]
-      }
+      title: 'Lesson 1: は / も',
+      lessonNumber: 1,
+      grammarRules: [
+        {
+          japanese: 'は',
+          romaji: 'wa',
+          englishTitle: 'Topic Marker',
+          description: 'Marks the topic (often the subject) of the sentence.',
+          structurePattern: '[Topic] は [Predicate]',
+          usageNotes: 'Use to mark the topic of the sentence.',
+          examples: [
+            { japaneseSentence: 'わたしは がくせいです。', englishTranslation: 'As for me, I am a student.' },
+            { japaneseSentence: 'これは ほんです。', englishTranslation: 'As for this, it is a book.' },
+          ],
+        },
+        {
+          japanese: 'も',
+          romaji: 'mo',
+          englishTitle: 'Also / Too',
+          description: 'Replaces は, が, or を to mean “also.”',
+          structurePattern: '[Subject] も [Predicate]',
+          usageNotes: 'Use to express that something is also true or also happens.',
+          examples: [
+            { japaneseSentence: 'わたしも がくせいです。', englishTranslation: 'I am also a student.' },
+            { japaneseSentence: 'にほんごも べんきょうします。', englishTranslation: 'I also study Japanese.' },
+          ],
+        },
+      ],
     },
     {
-      name: 'Vocabulary Rules',
-      rules: {
-        items: [
-          'Learn words in context rather than isolation',
-          'Practice spaced repetition for retention',
-          'Use example sentences to understand usage'
-        ]
-      }
-    },
-    {
-      name: 'Listening Rules',
-      rules: {
-        items: [
-          'Listen actively and repeatedly to short clips',
-          'Follow along with transcripts when available',
-          'Focus on rhythm, intonation and common phrases'
-        ]
-      }
+      title: 'Lesson 2: の / Demonstratives',
+      lessonNumber: 2,
+      grammarRules: [
+        {
+          japanese: 'の',
+          romaji: 'no',
+          englishTitle: 'Possession / Description',
+          description: 'Indicates possession or describes one noun by another.',
+          structurePattern: '[Noun] の [Noun]',
+          usageNotes: 'Use to show possession, ownership, or descriptive relationships.',
+          examples: [
+            { japaneseSentence: 'これは わたしの ほんです。', englishTranslation: 'This is my book.' },
+            { japaneseSentence: 'にほんの たべものは おいしいです。', englishTranslation: 'Japanese food is delicious.' },
+          ],
+        },
+        {
+          japanese: 'この・その・あの',
+          romaji: 'kono / sono / ano',
+          englishTitle: 'This / That / That over there + Noun',
+          description: 'Points to objects relative to the speaker or listener.',
+          structurePattern: 'この／その／あの + Noun',
+          usageNotes: 'Use この for near the speaker, その for near the listener, and あの for farther away.',
+          examples: [
+            { japaneseSentence: 'このほんは わたしのです。', englishTranslation: 'This book is mine.' },
+            { japaneseSentence: 'あのくるまは ふるいです。', englishTranslation: 'That car over there is old.' },
+          ],
+        },
+        {
+          japanese: 'これ・それ・あれ',
+          romaji: 'kore / sore / are',
+          englishTitle: 'This / That / That over there',
+          description: 'Used alone to refer to objects without a noun.',
+          structurePattern: 'これ／それ／あれ + は + Noun です',
+          usageNotes: 'Use これ for near the speaker, それ for near the listener, and あれ for farther away.',
+          examples: [
+            { japaneseSentence: 'これは ペンです。', englishTranslation: 'This is a pen.' },
+            { japaneseSentence: 'それは ほんです。', englishTranslation: 'That is a book.' },
+          ],
+        },
+      ],
     },
   ];
 
-  const created: any[] = [];
-  for (const r of rulesData) {
-    const rec = await prisma.rule.create({ data: r });
-    created.push(rec);
+  const createdLessons: any[] = [];
+  const createdRules: any[] = [];
+
+  for (const lessonSeed of lessonSeeds) {
+    const lesson = await prisma.lesson.create({
+      data: {
+        title: lessonSeed.title,
+        lessonNumber: lessonSeed.lessonNumber,
+        moduleId: module.id,
+      },
+    });
+    createdLessons.push(lesson);
+
+    for (const ruleSeed of lessonSeed.grammarRules) {
+      const rule = await prisma.grammarRule.create({
+        data: {
+          japanese: ruleSeed.japanese,
+          romaji: ruleSeed.romaji,
+          englishTitle: ruleSeed.englishTitle,
+          description: ruleSeed.description,
+          structurePattern: ruleSeed.structurePattern,
+          usageNotes: ruleSeed.usageNotes,
+          lessonId: lesson.id,
+          examples: {
+            create: ruleSeed.examples.map((example: any) => ({
+              japaneseSentence: example.japaneseSentence,
+              englishTranslation: example.englishTranslation,
+            })),
+          },
+        },
+      });
+      createdRules.push(rule);
+    }
   }
 
-  return created;
+  return { lessons: createdLessons, grammarRules: createdRules };
 }
 
 async function createModules() {
@@ -305,6 +402,85 @@ async function createModules() {
   }
 
   return modules;
+}
+
+async function createRuleModels(modules: any[]) {
+  const ruleSeedNames = [
+    'N5 Vocabulary Rule Set',
+    'N5 Kanji Rule Set',
+    'N5 Listening Rule Set',
+    'N5 Grammar Pattern Rule',
+    'N5 Sentence Structure Rule',
+  ];
+
+  await prisma.rule.deleteMany({ where: { name: { in: ruleSeedNames } } });
+
+  const ruleSeeds = [
+    {
+      name: 'N5 Vocabulary Rule Set',
+      rules: [
+        'Use core JLPT N5 vocabulary to create vocabulary practice exercises.',
+        'Vocabulary category: VOCABULARY',
+        'Example words: たべもの, のみもの, いえ, てんき',
+      ],
+      moduleSlug: 'n5-basic-vocabulary',
+    },
+    {
+      name: 'N5 Kanji Rule Set',
+      rules: [
+        'Focus on basic N5 kanji reading and meaning rules.',
+        'Kanji category: KANJI',
+        'Example kanji: 人, 大, 小, 山, 川',
+      ],
+      moduleSlug: 'n5-basic-kanji',
+    },
+    {
+      name: 'N5 Listening Rule Set',
+      rules: [
+        'Generate listening prompts and comprehension checks for N5 learners.',
+        'Listening category: LISTENING',
+        'Audio hints: short dialog, simple question, basic instruction',
+      ],
+      moduleSlug: 'n5-listening-basics',
+    },
+    {
+      name: 'N5 Grammar Pattern Rule',
+      rules: [
+        'Create grammar questions using common N5 sentence patterns.',
+        'Patterns: は, も, の, これ/それ/あれ',
+        'Difficulty: beginner',
+      ],
+      moduleSlug: 'n5-basic-vocabulary',
+    },
+    {
+      name: 'N5 Sentence Structure Rule',
+      rules: [
+        'Use simple subject-predicate sentence structures for N5 practice.',
+        'Patterns: [Topic] は [Predicate], [Noun] の [Noun]',
+      ],
+      moduleSlug: 'n5-basic-vocabulary',
+    },
+  ];
+
+  const createdRules: any[] = [];
+  const moduleMap = modules.reduce((map: Record<string, any>, module: any) => {
+    map[module.slug] = module;
+    return map;
+  }, {} as Record<string, any>);
+
+  for (const seed of ruleSeeds) {
+    const module = moduleMap[seed.moduleSlug];
+    const rule = await prisma.rule.create({
+      data: {
+        name: seed.name,
+        rules: seed.rules,
+        ...(module ? { modules: { connect: { id: module.id } } } : {}),
+      },
+    });
+    createdRules.push(rule);
+  }
+
+  return createdRules;
 }
 
 async function createQuestions(modules: any[]) {
