@@ -5,15 +5,15 @@ import { IsArray, IsBoolean, IsString, ValidateNested } from 'class-validator';
 class RapidFireAnswerDto {
   @ApiProperty({ description: 'Rapid-fire word ID that was answered' })
   @IsString()
-  wordId: string;
+  wordId!: string;
 
   @ApiProperty({ description: 'Whether the answer was correct' })
   @IsBoolean()
-  isCorrect: boolean;
+  isCorrect!: boolean;
 
   @ApiProperty({ description: 'Whether the word was marked as hard' })
   @IsBoolean()
-  isHard: boolean;
+  isHard!: boolean;
 }
 
 export class SubmitRapidFireAnswersDto {
@@ -21,5 +21,5 @@ export class SubmitRapidFireAnswersDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => RapidFireAnswerDto)
-  answers: RapidFireAnswerDto[];
+  answers!: RapidFireAnswerDto[];
 }

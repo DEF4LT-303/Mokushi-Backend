@@ -4,8 +4,8 @@ import { OverallStatsDto } from './overall-stats.dto';
 
 export class SubmitRapidFireAnswersResponseDto {
   @ApiProperty({ type: RapidFireLessonStatDto, description: 'Updated lesson rapid-fire statistics' })
-  updatedLesson: RapidFireLessonStatDto;
+  updatedLesson!: RapidFireLessonStatDto;
 
   @ApiProperty({ type: OverallStatsDto, description: 'Updated overall rapid-fire statistics' })
-  updatedOverall: OverallStatsDto;
+  updatedOverall!: OverallStatsDto;
 }
