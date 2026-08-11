@@ -33,6 +33,11 @@ export class CreateQuestionDto {
   @IsEnum(QuestionType)
   questionType!: QuestionType;
 
+  @ApiProperty({ required: false, description: 'Optional UUID of the lesson this question belongs to.' })
+  @IsOptional()
+  @IsUUID()
+  lessonId?: string;
+
   @ApiProperty({ description: 'UUID of the module this question belongs to.' })
   @IsUUID()
   moduleId!: string;

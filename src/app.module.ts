@@ -9,6 +9,7 @@ import { LeaderboardModule } from './leaderboard/leaderboard.module';
 import { LessonsModule } from './lessons/lessons.module';
 import { ModuleModule } from './module/module.module';
 import { QuestionsModule } from './questions/questions.module';
+import { RapidFireModule } from './rapid-fire/rapid-fire.module';
 import { UserAttemptsModule } from './user-attempts/user-attempts.module';
 import { UsersModule } from './users/users.module';
 
@@ -20,6 +21,7 @@ import { UsersModule } from './users/users.module';
     ModuleModule,
     LessonsModule,
     QuestionsModule,
+    RapidFireModule,
     UserAttemptsModule,
     JwtModule.register({
       secret: process.env.JWT_ACCESS_SECRET,
