@@ -14,13 +14,15 @@ export class QuestionsService {
 
   async findMany(params: {
     moduleId?: string;
+    lessonId?: string;
     questionType?: string;
     skip?: number;
     take?: number;
   }) {
-    const { moduleId, questionType, skip, take } = params;
+    const { moduleId, lessonId, questionType, skip, take } = params;
     const where = {
       moduleId: moduleId || undefined,
+      lessonId: lessonId || undefined,
       questionType: questionType as QuestionType || undefined,
     };
 
