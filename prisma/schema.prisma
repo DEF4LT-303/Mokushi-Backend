@@ -115,8 +115,6 @@ model Lesson {
   @@index([moduleId])
 }
 
-// RapidFireLesson removed. Lesson metadata (title, lessonNumber, jlptLevel)
-// has been moved into RapidFireLessonStat.
 model RapidFireLesson {
   id           String                 @id @default(uuid())
   title        String

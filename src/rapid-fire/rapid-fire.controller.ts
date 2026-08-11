@@ -20,9 +20,7 @@ export class RapidFireController {
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })
   @ApiQuery({ name: 'jlptLevel', required: false, enum: JlptLevel })
   async getCombinedStats(@CurrentUser() user: any, @Query('jlptLevel') jlptLevel?: JlptLevel) {
-    const overall = await this.rapidFireService.getOverallStats(user.id, jlptLevel);
-    const lessons = await this.rapidFireService.getLessonStats(user.id, jlptLevel);
-    return { overall, lessons };
+    return this.rapidFireService.getCombinedStats(user.id, jlptLevel);
   }
 
   @UseGuards(JwtGuard)

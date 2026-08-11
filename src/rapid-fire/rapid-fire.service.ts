@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { JlptLevel } from '@prisma/client';
+import { CacheService } from 'src/common/services/cache.service';
 import { DatabaseService } from 'src/database/database.service';
 import { RapidFireLessonOverviewDto } from './dto/lesson-detail.dto';
 import { RapidFireLessonStatDto } from './dto/lesson-stat.dto';
@@ -10,12 +11,68 @@ import { RapidFireWordDto } from './dto/rapid-fire-word.dto';
 
 @Injectable()
 export class RapidFireService {
-  constructor(private readonly databaseService: DatabaseService) { }
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly cache: CacheService,
+  ) { }
 
+  // TODO: remove once `npx prisma generate` picks up the RapidFire* models
   private get db() {
     return this.databaseService as any;
   }
 
+  private cacheKey(userId: string, level: JlptLevel) {
+    return `rapidfire:stats:${userId}:${level}`;
+  }
+
+  async getCombinedStats(userId: string, jlptLevel?: JlptLevel) {
+    const level = jlptLevel ?? JlptLevel.N5;
+    const cacheKey = this.cacheKey(userId, level);
+
+    const cached = await this.cache.get(cacheKey);
+    if (cached) return cached;
+
+    const [overall, lessons] = await Promise.all([
+      this.getOrCreateOverallStat(userId, level),
+      this.db.rapidFireLesson.findMany({
+        where: { jlptLevel: level },
+        select: {
+          id: true,
+          title: true,
+          lessonNumber: true,
+          _count: { select: { words: true } },
+        },
+        orderBy: { lessonNumber: 'asc' },
+      }),
+    ]);
+
+    const stats = await this.db.rapidFireLessonStat.findMany({ where: { overallStatId: overall.id } });
+
+    const lessonDtos: RapidFireLessonStatDto[] = lessons.map((lesson: any) => {
+      const stat = stats.find((s: any) => s.rapidFireLessonId === lesson.id);
+      return {
+        lessonId: lesson.id,
+        lessonNumber: lesson.lessonNumber,
+        lessonTitle: lesson.title,
+        totalWords: lesson._count.words,
+        masteryRate: stat?.masteryRate ?? 0,
+        hardWordCount: stat?.hardWordCount ?? 0,
+        totalAnswers: stat?.totalAnswers ?? 0,
+        totalCorrect: stat?.totalCorrect ?? 0,
+        lastPracticed: stat?.lastPracticed ? stat.lastPracticed.toISOString() : undefined,
+      };
+    });
+
+    const result = {
+      overall: this.mapOverallStatToDto(overall),
+      lessons: lessonDtos,
+    };
+
+    await this.cache.set(cacheKey, result, 30); // 30s TTL 
+    return result;
+  }
+
+  // Kept for any existing callers; delegates to the shared combined-fetch path where possible.
   async getOverallStats(userId: string, jlptLevel?: JlptLevel): Promise<OverallStatsDto> {
     const level = jlptLevel ?? JlptLevel.N5;
     const overall = await this.getOrCreateOverallStat(userId, level);
@@ -24,30 +81,8 @@ export class RapidFireService {
 
   async getLessonStats(userId: string, jlptLevel?: JlptLevel): Promise<RapidFireLessonStatDto[]> {
     const level = jlptLevel ?? JlptLevel.N5;
-    const overall = await this.getOrCreateOverallStat(userId, level);
-
-    const lessons = await this.db.rapidFireLesson.findMany({
-      where: { jlptLevel: level },
-      include: { words: true },
-      orderBy: { lessonNumber: 'asc' },
-    });
-
-    const stats = await this.db.rapidFireLessonStat.findMany({ where: { overallStatId: overall.id } });
-
-    return lessons.map((lesson: any) => {
-      const stat = stats.find((s: any) => s.rapidFireLessonId === lesson.id);
-      return {
-        lessonId: lesson.id,
-        lessonNumber: lesson.lessonNumber,
-        lessonTitle: lesson.title,
-        totalWords: lesson.words.length,
-        masteryRate: stat?.masteryRate ?? 0,
-        hardWordCount: stat?.hardWordCount ?? 0,
-        totalAnswers: stat?.totalAnswers ?? 0,
-        totalCorrect: stat?.totalCorrect ?? 0,
-        lastPracticed: stat?.lastPracticed ? stat.lastPracticed.toISOString() : undefined,
-      } as RapidFireLessonStatDto;
-    });
+    const combined = await this.getCombinedStats(userId, level);
+    return combined.lessons;
   }
 
   async getLessonDetail(userId: string, lessonId: string): Promise<RapidFireLessonOverviewDto> {
@@ -60,6 +95,7 @@ export class RapidFireService {
     const overallStat = await this.getOrCreateOverallStat(userId, rapidFireLesson.jlptLevel);
     const lessonStat = await this.getOrCreateLessonStat(
       overallStat.id,
+      overallStat.userId,
       rapidFireLesson.id,
       rapidFireLesson.lessonNumber,
       rapidFireLesson.words.length,
@@ -77,19 +113,25 @@ export class RapidFireService {
   }
 
   async getRapidFireWordsForLesson(lessonId: string): Promise<RapidFireWordDto[]> {
-    const lessonStat = await this.db.rapidFireLessonStat.findUnique({ where: { id: lessonId }, include: { words: true } });
+    const rapidFireLesson = await this.db.rapidFireLesson.findUnique({ where: { id: lessonId }, include: { words: true } });
 
-    if (!lessonStat) {
-      throw new NotFoundException(`Rapid-fire lesson stat for id '${lessonId}' not found`);
+    if (!rapidFireLesson) {
+      throw new NotFoundException(`Rapid-fire lesson for id '${lessonId}' not found`);
     }
 
-    return lessonStat.words.map((word: any) => this.mapWordToDto(word));
+    return rapidFireLesson.words.map((word: any) => this.mapWordToDto(word));
   }
 
   async submitAnswers(userId: string, lessonId: string, dto: SubmitRapidFireAnswersDto): Promise<SubmitRapidFireAnswersResponseDto> {
     if (!dto.answers || dto.answers.length === 0) {
       throw new BadRequestException('At least one answer is required');
     }
+
+    const submittedIds = dto.answers.map(a => a.wordId);
+    if (new Set(submittedIds).size !== submittedIds.length) {
+      throw new BadRequestException('Duplicate wordId in answers');
+    }
+
     const rapidFireLesson = await this.db.rapidFireLesson.findUnique({ where: { id: lessonId }, include: { words: true } });
 
     if (!rapidFireLesson) {
@@ -106,6 +148,7 @@ export class RapidFireService {
     const overallStat = await this.getOrCreateOverallStat(userId, rapidFireLesson.jlptLevel);
     const lessonStat = await this.getOrCreateLessonStat(
       overallStat.id,
+      overallStat.userId,
       rapidFireLesson.id,
       rapidFireLesson.lessonNumber,
       rapidFireLesson.words.length,
@@ -134,9 +177,9 @@ export class RapidFireService {
         where: { overallStatId_rapidFireLessonId: { overallStatId: overallStat.id, rapidFireLessonId: rapidFireLesson.id } },
         data: {
           totalWords: rapidFireLesson.words.length,
-          hardWordCount: lessonStat.hardWordCount + hardWordCount,
-          totalAnswers: updatedLessonTotalAnswers,
-          totalCorrect: updatedLessonTotalCorrect,
+          hardWordCount: { increment: hardWordCount },
+          totalAnswers: { increment: totalAnswers },
+          totalCorrect: { increment: totalCorrect },
           masteryRate: updatedLessonMasteryRate,
           lastPracticed: new Date(),
         },
@@ -145,13 +188,15 @@ export class RapidFireService {
         where: { userId_jlptLevel: { userId: overallStat.userId, jlptLevel: overallStat.jlptLevel } },
         data: {
           ...(shouldConnect ? { lessonsPracticed: { connect: { id: rapidFireLesson.id } } } : {}),
-          totalHardWords: overallStat.totalHardWords + hardWordCount,
-          totalAnswers: updatedOverallTotalAnswers,
-          totalCorrect: updatedOverallTotalCorrect,
+          totalHardWords: { increment: hardWordCount },
+          totalAnswers: { increment: totalAnswers },
+          totalCorrect: { increment: totalCorrect },
           masteryRate: updatedOverallMasteryRate,
         },
       }),
     ]);
+
+    await this.cache.delete(this.cacheKey(userId, rapidFireLesson.jlptLevel));
 
     return {
       updatedLesson: this.mapLessonStatToDto({ ...updatedLessonStat, rapidFireLesson }),
@@ -160,22 +205,10 @@ export class RapidFireService {
   }
 
   private async getOrCreateOverallStat(userId: string, jlptLevel: JlptLevel) {
-    const overallStat = await this.db.rapidFireOverallStat.findUnique({
-      where: {
-        userId_jlptLevel: {
-          userId,
-          jlptLevel,
-        },
-      },
-      include: { lessonsPracticed: true },
-    });
-
-    if (overallStat) {
-      return overallStat;
-    }
-
-    return this.db.rapidFireOverallStat.create({
-      data: {
+    return this.db.rapidFireOverallStat.upsert({
+      where: { userId_jlptLevel: { userId, jlptLevel } },
+      update: {},
+      create: {
         userId,
         jlptLevel,
         masteryRate: 0,
@@ -184,22 +217,21 @@ export class RapidFireService {
         totalAnswers: 0,
         totalCorrect: 0,
       },
+      include: { lessonsPracticed: true },
     });
   }
 
-  private async getOrCreateLessonStat(overallStatId: string, rapidFireLessonId: string, lessonNumber: number, totalWords: number) {
-    const existing = await this.db.rapidFireLessonStat.findUnique({
+  private async getOrCreateLessonStat(
+    overallStatId: string,
+    userId: string,
+    rapidFireLessonId: string,
+    lessonNumber: number,
+    totalWords: number,
+  ) {
+    return this.db.rapidFireLessonStat.upsert({
       where: { overallStatId_rapidFireLessonId: { overallStatId, rapidFireLessonId } },
-    });
-
-    if (existing) return existing;
-
-    // grab overall to obtain userId for denormalized relation
-    const overall = await this.db.rapidFireOverallStat.findUnique({ where: { id: overallStatId } });
-    const userId = overall?.userId ?? null;
-
-    return this.db.rapidFireLessonStat.create({
-      data: {
+      update: {},
+      create: {
         overallStatId,
         rapidFireLessonId,
         userId,
