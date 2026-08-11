@@ -36,7 +36,9 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  refreshTokens RefreshToken[]
+  refreshTokens         RefreshToken[]
+  rapidFireOverallStats RapidFireOverallStat[]
+  rapidFireLessonStats  RapidFireLessonStat[]
 }
 
 model RefreshToken {
@@ -106,10 +108,89 @@ model Lesson {
 
   grammarRules GrammarRule[]
 
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  rapidFireLessonStats RapidFireLessonStat[]
+
+  @@index([moduleId])
+}
+
+model RapidFireLesson {
+  id           String                 @id @default(uuid())
+  title        String
+  lessonNumber Int
+  jlptLevel    JlptLevel              @default(N5)
+  words        RapidFireWord[]
+  practicedBy  RapidFireOverallStat[]
+
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @default(now())
+  rapidFireLessonStats RapidFireLessonStat[]
+
+  @@index([jlptLevel])
+}
+
+model RapidFireWord {
+  id                String          @id @default(uuid())
+  word              String
+  reading           String
+  romaji            String
+  meaning           String
+  rapidFireLessonId String
+  rapidFireLesson   RapidFireLesson @relation(fields: [rapidFireLessonId], references: [id], onDelete: Cascade)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([moduleId])
+  @@index([rapidFireLessonId])
+}
+
+model RapidFireOverallStat {
+  id               String            @id @default(uuid())
+  userId           String
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  jlptLevel        JlptLevel         @default(N5)
+  lessonsPracticed RapidFireLesson[]
+  masteryRate      Int               @default(0)
+  totalHardWords   Int               @default(0)
+  totalLessons     Int               @default(25)
+  totalAnswers     Int               @default(0)
+  totalCorrect     Int               @default(0)
+
+  lessonStats RapidFireLessonStat[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, jlptLevel])
+  @@index([userId])
+}
+
+model RapidFireLessonStat {
+  id                String               @id @default(uuid())
+  overallStatId     String
+  overallStat       RapidFireOverallStat @relation(fields: [overallStatId], references: [id], onDelete: Cascade)
+  rapidFireLessonId String
+  rapidFireLesson   RapidFireLesson      @relation(fields: [rapidFireLessonId], references: [id], onDelete: Cascade)
+  userId            String
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonNumber      Int
+  totalWords        Int                  @default(0)
+  masteryRate       Int                  @default(0)
+  hardWordCount     Int                  @default(0)
+  totalAnswers      Int                  @default(0)
+  totalCorrect      Int                  @default(0)
+  lastPracticed     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  lesson    Lesson?  @relation(fields: [lessonId], references: [id])
+  lessonId  String?
+
+  @@unique([overallStatId, rapidFireLessonId])
+  @@index([rapidFireLessonId])
+  @@index([userId])
+  @@index([overallStatId])
 }
 
 model GrammarRule {

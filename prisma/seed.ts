@@ -24,6 +24,8 @@ async function main() {
   let questions: any[] = [];
   let quizzes: any[] = [];
   let attempts: any[] = [];
+  let rapidFireLessons: any[] = [];
+  let rapidFireOverallStats: any[] = [];
   let ruleModels: any[] = [];
 
   // Create users
@@ -101,6 +103,19 @@ async function main() {
     }
     attempts = await createSampleAttempts(users, quizzes);
     console.log(`🧪 Created ${attempts.length} sample user attempts`);
+  }
+
+  if (shouldRun('rapid-fire') || shouldRun('rapidfire')) {
+    const seedTitles = ['Rapid Fire N5 Vocabulary', 'Rapid Fire N5 Kanji'];
+    // Remove previous seed overall stats (cascades to lesson stats & words)
+    await prisma.rapidFireOverallStat.deleteMany({ where: { user: { email: { contains: 'seed+' } } } });
+
+    // Build seed data and create overall stats with nested lesson stats + words
+    rapidFireLessons = await createRapidFireLessons();
+    if (users.length && rapidFireLessons.length) {
+      rapidFireOverallStats = await createRapidFireStats(users, rapidFireLessons);
+      console.log(`📊 Created ${rapidFireOverallStats.length} sample rapid-fire stats`);
+    }
   }
 
   console.log('✅ Database seeding completed successfully!');
@@ -650,6 +665,92 @@ function generateExplanation(questionType: QuestionType) {
 
 
 // Create sample user attempts and user answers for the first quiz
+async function createRapidFireLessons() {
+  const rapidFireLessons: any[] = [];
+
+  const lessonSeedData = [
+    {
+      title: 'Rapid Fire N5 Vocabulary',
+      lessonNumber: 1,
+      jlptLevel: JlptLevel.N5,
+      words: [
+        { word: 'たべもの', reading: 'たべもの', romaji: 'tabemono', meaning: 'food' },
+        { word: 'のみもの', reading: 'のみもの', romaji: 'nomimono', meaning: 'drink' },
+        { word: 'いえ', reading: 'いえ', romaji: 'ie', meaning: 'house' },
+        { word: 'ともだち', reading: 'ともだち', romaji: 'tomodachi', meaning: 'friend' },
+        { word: 'がっこう', reading: 'がっこう', romaji: 'gakkou', meaning: 'school' },
+      ],
+    },
+    {
+      title: 'Rapid Fire N5 Kanji',
+      lessonNumber: 2,
+      jlptLevel: JlptLevel.N5,
+      words: [
+        { word: '人', reading: 'ひと', romaji: 'hito', meaning: 'person' },
+        { word: '大', reading: 'だい', romaji: 'dai', meaning: 'big' },
+        { word: '小', reading: 'しょう', romaji: 'shou', meaning: 'small' },
+        { word: '山', reading: 'やま', romaji: 'yama', meaning: 'mountain' },
+        { word: '川', reading: 'かわ', romaji: 'kawa', meaning: 'river' },
+      ],
+    },
+  ];
+
+  for (const seed of lessonSeedData) {
+    const rapidFireLesson = await prisma.rapidFireLesson.create({
+      data: {
+        title: seed.title,
+        lessonNumber: seed.lessonNumber,
+        jlptLevel: seed.jlptLevel,
+        words: { create: seed.words },
+      },
+      include: { words: true },
+    });
+    rapidFireLessons.push(rapidFireLesson);
+  }
+
+  return rapidFireLessons;
+}
+
+async function createRapidFireStats(users: any[], rapidFireLessons: any[]) {
+  const overallStats: any[] = [];
+  if (!users.length || !rapidFireLessons.length) return overallStats;
+
+  const seedUser = users.find((u: any) => u.email?.includes('seed+')) || users[0];
+  if (!seedUser) return overallStats;
+  // Create one overall stat for the seed user and nested lesson stats that reference the static lessons
+  const overallStat = await prisma.rapidFireOverallStat.create({
+    data: {
+      userId: seedUser.id,
+      jlptLevel: rapidFireLessons[0].jlptLevel,
+      masteryRate: 80,
+      totalHardWords: 2,
+      totalLessons: 25,
+      totalAnswers: 10,
+      totalCorrect: 8,
+      lessonStats: {
+        create: rapidFireLessons.map((lesson) => ({
+          rapidFireLessonId: lesson.id,
+          userId: seedUser.id,
+          lessonNumber: lesson.lessonNumber,
+          totalWords: lesson.words.length,
+          masteryRate: 80,
+          hardWordCount: 2,
+          totalAnswers: 10,
+          totalCorrect: 8,
+          lastPracticed: new Date(),
+        })),
+      },
+      lessonsPracticed: {
+        connect: [{ id: rapidFireLessons[0].id }],
+      },
+    },
+    include: { lessonStats: true },
+  });
+
+  overallStats.push(overallStat);
+  return overallStats;
+}
+
 async function createSampleAttempts(users: any[], quizzes: any[]) {
   const attempts: any[] = [];
   if (!quizzes.length) return attempts;
