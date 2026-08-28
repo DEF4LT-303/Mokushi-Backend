@@ -16,11 +16,6 @@ export class RapidFireService {
     private readonly cache: CacheService,
   ) { }
 
-  // TODO: remove once `npx prisma generate` picks up the RapidFire* models
-  private get db() {
-    return this.databaseService as any;
-  }
-
   private cacheKey(userId: string, level: JlptLevel) {
     return `rapidfire:stats:${userId}:${level}`;
   }
@@ -34,7 +29,7 @@ export class RapidFireService {
 
     const [overall, lessons] = await Promise.all([
       this.getOrCreateOverallStat(userId, level),
-      this.db.rapidFireLesson.findMany({
+      this.databaseService.rapidFireLesson.findMany({
         where: { jlptLevel: level },
         select: {
           id: true,
@@ -46,11 +41,11 @@ export class RapidFireService {
       }),
     ]);
 
-    const stats = await this.db.rapidFireLessonStat.findMany({ where: { overallStatId: overall.id } });
+    const stats = await this.databaseService.rapidFireLessonStat.findMany({ where: { overallStatId: overall.id } });
 
     // compute hard-word counts per lesson dynamically and collect hard words
     const lessonIds = lessons.map((l: any) => l.id);
-    const hardMarks = await this.db.hardWord.findMany({
+    const hardMarks = await this.databaseService.hardWord.findMany({
       where: { userId, rapidFireWord: { rapidFireLessonId: { in: lessonIds } } },
       include: { rapidFireWord: true },
     });
@@ -104,7 +99,7 @@ export class RapidFireService {
   }
 
   async getLessonDetail(userId: string, lessonId: string): Promise<RapidFireLessonOverviewDto> {
-    const rapidFireLesson = await this.db.rapidFireLesson.findUnique({ where: { id: lessonId }, include: { words: true } });
+    const rapidFireLesson = await this.databaseService.rapidFireLesson.findUnique({ where: { id: lessonId }, include: { words: true } });
 
     if (!rapidFireLesson) {
       throw new NotFoundException(`Rapid-fire lesson for id '${lessonId}' not found`);
@@ -120,7 +115,7 @@ export class RapidFireService {
     );
 
     // fetch user's hard-word marks for this lesson
-    const hardMarks = await this.db.hardWord.findMany({ where: { userId, rapidFireWord: { rapidFireLessonId: rapidFireLesson.id } }, include: { rapidFireWord: true } });
+    const hardMarks = await this.databaseService.hardWord.findMany({ where: { userId, rapidFireWord: { rapidFireLessonId: rapidFireLesson.id } }, include: { rapidFireWord: true } });
     const hardIds = new Set(hardMarks.map((h: any) => h.rapidFireWordId));
     const hardWordsDto = rapidFireLesson.words.filter((w: any) => hardIds.has(w.id)).map((w: any) => this.mapWordToDto(w, true));
 
@@ -136,7 +131,7 @@ export class RapidFireService {
   }
 
   async getRapidFireWordsForLesson(lessonId: string): Promise<RapidFireWordDto[]> {
-    const rapidFireLesson = await this.db.rapidFireLesson.findUnique({ where: { id: lessonId }, include: { words: true } });
+    const rapidFireLesson = await this.databaseService.rapidFireLesson.findUnique({ where: { id: lessonId }, include: { words: true } });
 
     if (!rapidFireLesson) {
       throw new NotFoundException(`Rapid-fire lesson for id '${lessonId}' not found`);
@@ -155,7 +150,7 @@ export class RapidFireService {
       throw new BadRequestException('Duplicate wordId in answers');
     }
 
-    const rapidFireLesson = await this.db.rapidFireLesson.findUnique({ where: { id: lessonId }, include: { words: true } });
+    const rapidFireLesson = await this.databaseService.rapidFireLesson.findUnique({ where: { id: lessonId }, include: { words: true } });
 
     if (!rapidFireLesson) {
       throw new NotFoundException(`Rapid-fire lesson for id '${lessonId}' not found`);
@@ -182,7 +177,7 @@ export class RapidFireService {
     const submittedHardWordIds = dto.answers.filter(a => a.isHard).map(a => a.wordId);
 
     // fetch existing hard-word marks for these submitted words
-    const existingHardMarks = await this.db.hardWord.findMany({ where: { userId, rapidFireWordId: { in: dto.answers.map(a => a.wordId) } } });
+    const existingHardMarks = await this.databaseService.hardWord.findMany({ where: { userId, rapidFireWordId: { in: dto.answers.map(a => a.wordId) } } });
     const existingSet = new Set(existingHardMarks.map(h => h.rapidFireWordId));
 
     const toCreate = dto.answers.filter(a => a.isHard && !existingSet.has(a.wordId)).map(a => ({ userId, rapidFireWordId: a.wordId }));
@@ -208,8 +203,8 @@ export class RapidFireService {
       ? Math.round((updatedOverallTotalCorrect / updatedOverallTotalAnswers) * 100)
       : 0;
 
-    const [updatedLessonStat, updatedOverallStat] = await this.db.$transaction([
-      this.db.rapidFireLessonStat.update({
+    const [updatedLessonStat, updatedOverallStat] = await this.databaseService.$transaction([
+      this.databaseService.rapidFireLessonStat.update({
         where: { overallStatId_rapidFireLessonId: { overallStatId: overallStat.id, rapidFireLessonId: rapidFireLesson.id } },
         data: {
           totalWords: rapidFireLesson.words.length,
@@ -219,7 +214,7 @@ export class RapidFireService {
           lastPracticed: new Date(),
         },
       }),
-      this.db.rapidFireOverallStat.update({
+      this.databaseService.rapidFireOverallStat.update({
         where: { userId_jlptLevel: { userId: overallStat.userId, jlptLevel: overallStat.jlptLevel } },
         data: {
           ...(shouldConnect ? { lessonsPracticed: { connect: { id: rapidFireLesson.id } } } : {}),
@@ -231,15 +226,15 @@ export class RapidFireService {
         },
       }),
       // create new hard-word marks
-      ...(toCreate.length ? [this.db.hardWord.createMany({ data: toCreate })] : []),
+      ...(toCreate.length ? [this.databaseService.hardWord.createMany({ data: toCreate })] : []),
       // remove unmarked hard-word entries
-      ...(toDelete.length ? [this.db.hardWord.deleteMany({ where: { id: { in: toDelete.map(d => d.id) } } })] : []),
+      ...(toDelete.length ? [this.databaseService.hardWord.deleteMany({ where: { id: { in: toDelete.map(d => d.id) } } })] : []),
     ]);
 
     await this.cache.delete(this.cacheKey(userId, rapidFireLesson.jlptLevel));
 
     // fetch updated hard-word marks for this lesson for the user
-    const updatedHardMarks = await this.db.hardWord.findMany({ where: { userId, rapidFireWord: { rapidFireLessonId: rapidFireLesson.id } }, include: { rapidFireWord: true } });
+    const updatedHardMarks = await this.databaseService.hardWord.findMany({ where: { userId, rapidFireWord: { rapidFireLessonId: rapidFireLesson.id } }, include: { rapidFireWord: true } });
     const updatedHardWords = (updatedHardMarks ?? []).map((h: any) => h.rapidFireWord);
 
     return {
@@ -249,7 +244,7 @@ export class RapidFireService {
   }
 
   private async getOrCreateOverallStat(userId: string, jlptLevel: JlptLevel) {
-    return this.db.rapidFireOverallStat.upsert({
+    return this.databaseService.rapidFireOverallStat.upsert({
       where: { userId_jlptLevel: { userId, jlptLevel } },
       update: {},
       create: {
@@ -272,7 +267,7 @@ export class RapidFireService {
     lessonNumber: number,
     totalWords: number,
   ) {
-    return this.db.rapidFireLessonStat.upsert({
+    return this.databaseService.rapidFireLessonStat.upsert({
       where: { overallStatId_rapidFireLessonId: { overallStatId, rapidFireLessonId } },
       update: {},
       create: {
