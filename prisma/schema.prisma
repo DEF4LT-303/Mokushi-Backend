@@ -32,6 +32,7 @@ model User {
   provider  String  @default("local")
 
   userAttempts UserAttempt[]
+  hardWords    HardWord[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -138,6 +139,7 @@ model RapidFireWord {
   meaning           String
   rapidFireLessonId String
   rapidFireLesson   RapidFireLesson @relation(fields: [rapidFireLessonId], references: [id], onDelete: Cascade)
+  hardMarks         HardWord[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -177,7 +179,6 @@ model RapidFireLessonStat {
   lessonNumber      Int
   totalWords        Int                  @default(0)
   masteryRate       Int                  @default(0)
-  hardWordCount     Int                  @default(0)
   totalAnswers      Int                  @default(0)
   totalCorrect      Int                  @default(0)
   lastPracticed     DateTime?
@@ -191,6 +192,19 @@ model RapidFireLessonStat {
   @@index([rapidFireLessonId])
   @@index([userId])
   @@index([overallStatId])
+}
+
+model HardWord {
+  id              String        @id @default(uuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rapidFireWordId String
+  rapidFireWord   RapidFireWord @relation(fields: [rapidFireWordId], references: [id], onDelete: Cascade)
+  createdAt       DateTime      @default(now())
+
+  @@unique([userId, rapidFireWordId])
+  @@index([userId])
+  @@index([rapidFireWordId])
 }
 
 model GrammarRule {

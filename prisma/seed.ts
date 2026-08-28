@@ -734,7 +734,6 @@ async function createRapidFireStats(users: any[], rapidFireLessons: any[]) {
           lessonNumber: lesson.lessonNumber,
           totalWords: lesson.words.length,
           masteryRate: 80,
-          hardWordCount: 2,
           totalAnswers: 10,
           totalCorrect: 8,
           lastPracticed: new Date(),
@@ -748,6 +747,16 @@ async function createRapidFireStats(users: any[], rapidFireLessons: any[]) {
   });
 
   overallStats.push(overallStat);
+  // create some sample HardWord entries for the seed user (mark first two words of first lesson as hard)
+  try {
+    const firstLessonWords = rapidFireLessons[0]?.words || [];
+    const hardRecords = firstLessonWords.slice(0, 2).map((w: any) => ({ userId: seedUser.id, rapidFireWordId: w.id }));
+    if (hardRecords.length) {
+      await prisma.hardWord.createMany({ data: hardRecords });
+    }
+  } catch (err) {
+    // ignore if table doesn't exist yet when running older migrations
+  }
   return overallStats;
 }
 
