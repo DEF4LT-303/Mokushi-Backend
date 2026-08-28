@@ -24,7 +24,7 @@ export class RapidFireController {
   }
 
   @UseGuards(JwtGuard)
-  @Post('start/:lessonId')
+  @Get('start/:lessonId')
   @ApiOperation({ summary: 'Start a rapid-fire quiz and return the lesson words' })
   @ApiBearerAuth()
   @ApiUnauthorizedResponse({ description: 'Unauthorized' })

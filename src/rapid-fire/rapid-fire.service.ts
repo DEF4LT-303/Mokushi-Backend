@@ -48,6 +48,23 @@ export class RapidFireService {
 
     const stats = await this.db.rapidFireLessonStat.findMany({ where: { overallStatId: overall.id } });
 
+    // compute hard-word counts per lesson dynamically and collect hard words
+    const lessonIds = lessons.map((l: any) => l.id);
+    const hardMarks = await this.db.hardWord.findMany({
+      where: { userId, rapidFireWord: { rapidFireLessonId: { in: lessonIds } } },
+      include: { rapidFireWord: true },
+    });
+
+    const hardCountByLesson: Record<string, number> = {};
+    const hardWordsByLesson: Record<string, any[]> = {};
+    for (const hm of hardMarks) {
+      const w = hm.rapidFireWord;
+      const lid = w.rapidFireLessonId;
+      hardCountByLesson[lid] = (hardCountByLesson[lid] ?? 0) + 1;
+      hardWordsByLesson[lid] = hardWordsByLesson[lid] ?? [];
+      hardWordsByLesson[lid].push(w);
+    }
+
     const lessonDtos: RapidFireLessonStatDto[] = lessons.map((lesson: any) => {
       const stat = stats.find((s: any) => s.rapidFireLessonId === lesson.id);
       return {
@@ -56,7 +73,8 @@ export class RapidFireService {
         lessonTitle: lesson.title,
         totalWords: lesson._count.words,
         masteryRate: stat?.masteryRate ?? 0,
-        hardWordCount: stat?.hardWordCount ?? 0,
+        hardWordCount: hardCountByLesson[lesson.id] ?? 0,
+        hardWords: (hardWordsByLesson[lesson.id] ?? []).map((w: any) => this.mapWordToDto(w, true)),
         totalAnswers: stat?.totalAnswers ?? 0,
         totalCorrect: stat?.totalCorrect ?? 0,
         lastPracticed: stat?.lastPracticed ? stat.lastPracticed.toISOString() : undefined,
@@ -101,13 +119,18 @@ export class RapidFireService {
       rapidFireLesson.words.length,
     );
 
+    // fetch user's hard-word marks for this lesson
+    const hardMarks = await this.db.hardWord.findMany({ where: { userId, rapidFireWord: { rapidFireLessonId: rapidFireLesson.id } }, include: { rapidFireWord: true } });
+    const hardIds = new Set(hardMarks.map((h: any) => h.rapidFireWordId));
+    const hardWordsDto = rapidFireLesson.words.filter((w: any) => hardIds.has(w.id)).map((w: any) => this.mapWordToDto(w, true));
+
     return {
       lessonId: rapidFireLesson.id,
       lessonTitle: rapidFireLesson.title,
       lessonNumber: rapidFireLesson.lessonNumber,
       jlptLevel: rapidFireLesson.jlptLevel,
-      words: rapidFireLesson.words.map((word: any) => this.mapWordToDto(word)),
-      lessonStat: this.mapLessonStatToDto({ ...lessonStat, rapidFireLesson }),
+      words: rapidFireLesson.words.map((word: any) => this.mapWordToDto(word, hardIds.has(word.id))),
+      lessonStat: this.mapLessonStatToDto({ ...lessonStat, rapidFireLesson }, hardMarks.length, hardWordsDto),
       overallStat: this.mapOverallStatToDto(overallStat),
     };
   }
@@ -156,7 +179,20 @@ export class RapidFireService {
 
     const totalAnswers = dto.answers.length;
     const totalCorrect = dto.answers.filter(answer => answer.isCorrect).length;
-    const hardWordCount = dto.answers.filter(answer => answer.isHard).length;
+    const submittedHardWordIds = dto.answers.filter(a => a.isHard).map(a => a.wordId);
+
+    // fetch existing hard-word marks for these submitted words
+    const existingHardMarks = await this.db.hardWord.findMany({ where: { userId, rapidFireWordId: { in: dto.answers.map(a => a.wordId) } } });
+    const existingSet = new Set(existingHardMarks.map(h => h.rapidFireWordId));
+
+    const toCreate = dto.answers.filter(a => a.isHard && !existingSet.has(a.wordId)).map(a => ({ userId, rapidFireWordId: a.wordId }));
+    const toDelete = existingHardMarks.filter(h => {
+      const dtoEntry = dto.answers.find(a => a.wordId === h.rapidFireWordId);
+      return !dtoEntry || !dtoEntry.isHard;
+    });
+
+    const hardWordCount = submittedHardWordIds.length;
+    const deltaHard = toCreate.length - toDelete.length;
 
     const updatedLessonTotalAnswers = lessonStat.totalAnswers + totalAnswers;
     const updatedLessonTotalCorrect = lessonStat.totalCorrect + totalCorrect;
@@ -177,7 +213,6 @@ export class RapidFireService {
         where: { overallStatId_rapidFireLessonId: { overallStatId: overallStat.id, rapidFireLessonId: rapidFireLesson.id } },
         data: {
           totalWords: rapidFireLesson.words.length,
-          hardWordCount: { increment: hardWordCount },
           totalAnswers: { increment: totalAnswers },
           totalCorrect: { increment: totalCorrect },
           masteryRate: updatedLessonMasteryRate,
@@ -188,18 +223,27 @@ export class RapidFireService {
         where: { userId_jlptLevel: { userId: overallStat.userId, jlptLevel: overallStat.jlptLevel } },
         data: {
           ...(shouldConnect ? { lessonsPracticed: { connect: { id: rapidFireLesson.id } } } : {}),
-          totalHardWords: { increment: hardWordCount },
+          ...(deltaHard > 0 ? { totalHardWords: { increment: deltaHard } } : {}),
+          ...(deltaHard < 0 ? { totalHardWords: { decrement: Math.abs(deltaHard) } } : {}),
           totalAnswers: { increment: totalAnswers },
           totalCorrect: { increment: totalCorrect },
           masteryRate: updatedOverallMasteryRate,
         },
       }),
+      // create new hard-word marks
+      ...(toCreate.length ? [this.db.hardWord.createMany({ data: toCreate })] : []),
+      // remove unmarked hard-word entries
+      ...(toDelete.length ? [this.db.hardWord.deleteMany({ where: { id: { in: toDelete.map(d => d.id) } } })] : []),
     ]);
 
     await this.cache.delete(this.cacheKey(userId, rapidFireLesson.jlptLevel));
 
+    // fetch updated hard-word marks for this lesson for the user
+    const updatedHardMarks = await this.db.hardWord.findMany({ where: { userId, rapidFireWord: { rapidFireLessonId: rapidFireLesson.id } }, include: { rapidFireWord: true } });
+    const updatedHardWords = (updatedHardMarks ?? []).map((h: any) => h.rapidFireWord);
+
     return {
-      updatedLesson: this.mapLessonStatToDto({ ...updatedLessonStat, rapidFireLesson }),
+      updatedLesson: this.mapLessonStatToDto({ ...updatedLessonStat, rapidFireLesson }, updatedHardWords.length, updatedHardWords),
       updatedOverall: this.mapOverallStatToDto(updatedOverallStat),
     };
   }
@@ -238,7 +282,6 @@ export class RapidFireService {
         lessonNumber,
         totalWords,
         masteryRate: 0,
-        hardWordCount: 0,
         totalAnswers: 0,
         totalCorrect: 0,
       },
@@ -262,27 +305,29 @@ export class RapidFireService {
     };
   }
 
-  private mapLessonStatToDto(stat: any): RapidFireLessonStatDto {
+  private mapLessonStatToDto(stat: any, hardWordCount?: number, hardWords?: any[]): RapidFireLessonStatDto {
     return {
       lessonId: stat.rapidFireLesson?.id ?? stat.rapidFireLessonId ?? stat.id,
       lessonNumber: stat.lessonNumber,
       lessonTitle: stat.rapidFireLesson?.title ?? stat.title,
       totalWords: stat.totalWords,
       masteryRate: stat.masteryRate,
-      hardWordCount: stat.hardWordCount,
+      hardWordCount: hardWordCount ?? stat.hardWordCount ?? 0,
+      hardWords: (hardWords ?? []).map((w: any) => this.mapWordToDto(w, true)),
       totalAnswers: stat.totalAnswers,
       totalCorrect: stat.totalCorrect,
       lastPracticed: stat.lastPracticed ? stat.lastPracticed.toISOString() : undefined,
     };
   }
 
-  private mapWordToDto(word: any): RapidFireWordDto {
+  private mapWordToDto(word: any, isHard?: boolean): RapidFireWordDto {
     return {
       id: word.id,
       word: word.word,
       reading: word.reading,
       romaji: word.romaji,
       meaning: word.meaning,
+      isHard: !!isHard,
     };
   }
 }

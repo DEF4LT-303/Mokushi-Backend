@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { RapidFireWordDto } from './rapid-fire-word.dto';
 
 export class RapidFireLessonStatDto {
   @ApiProperty({ description: 'Lesson ID' })
@@ -18,6 +19,9 @@ export class RapidFireLessonStatDto {
 
   @ApiProperty({ description: 'Number of words marked as hard for this lesson', example: 4 })
   hardWordCount!: number;
+
+  @ApiPropertyOptional({ description: 'List of words the user marked as hard for this lesson', type: [RapidFireWordDto] })
+  hardWords?: RapidFireWordDto[];
 
   @ApiProperty({ description: 'Total answers submitted for this lesson', example: 18 })
   totalAnswers!: number;

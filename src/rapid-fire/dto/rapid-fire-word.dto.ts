@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class RapidFireWordDto {
   @ApiProperty({ description: 'Rapid fire word ID' })
@@ -15,4 +15,7 @@ export class RapidFireWordDto {
 
   @ApiProperty({ description: 'English meaning' })
   meaning!: string;
+
+  @ApiPropertyOptional({ description: 'Whether the user marked this word as hard' })
+  isHard?: boolean;
 }
