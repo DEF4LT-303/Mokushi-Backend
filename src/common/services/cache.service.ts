@@ -9,6 +9,10 @@ interface CacheEntry {
 export class CacheService {
   private cache: Map<string, CacheEntry> = new Map();
 
+  constructor() {
+    this.startCleanupInterval();
+  }
+
   async get(key: string): Promise<any> {
     const entry = this.cache.get(key);
 

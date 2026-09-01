@@ -11,7 +11,7 @@ export interface CookieOptions {
 export const getCookieOptions = (isProduction: boolean): CookieOptions => ({
   httpOnly: true,
   secure: isProduction,
-  sameSite: 'none',
+  sameSite: isProduction ? 'strict' : 'lax',
   maxAge: 0,
   path: '/',
 });

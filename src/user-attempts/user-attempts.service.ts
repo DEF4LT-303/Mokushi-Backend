@@ -179,7 +179,7 @@ export class UserAttemptsService {
       });
     });
 
-    await this.invalidateLeaderboardCache(updatedAttempt.quiz.moduleId, updatedAttempt.quiz.jlptLevel);
+    await this.invalidateLeaderboardCache(updatedAttempt.userId, updatedAttempt.quiz.moduleId, updatedAttempt.quiz.jlptLevel);
 
     // Build detailed results with full question data for all questions
     const results = allQuizQuestions.map((qq) => {
