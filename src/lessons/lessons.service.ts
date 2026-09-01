@@ -1,10 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DatabaseService } from 'src/database/database.service';
-import { CreateGrammarRuleDto } from 'src/module/dto/create-grammar-rule.dto';
-import { CreateLessonDto } from 'src/module/dto/create-lesson.dto';
-import { UpdateGrammarRuleDto } from 'src/module/dto/update-grammar-rule.dto';
-import { UpdateLessonDto } from 'src/module/dto/update-lesson.dto';
-
+import { DatabaseService } from '../database/database.service';
+import { CreateGrammarRuleDto } from '../module/dto/create-grammar-rule.dto';
+import { CreateLessonDto } from '../module/dto/create-lesson.dto';
+import { UpdateGrammarRuleDto } from '../module/dto/update-grammar-rule.dto';
+import { UpdateLessonDto } from '../module/dto/update-lesson.dto';
 @Injectable()
 export class LessonsService {
   constructor(private readonly databaseService: DatabaseService) { }

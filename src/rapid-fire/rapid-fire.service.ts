@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { JlptLevel } from '@prisma/client';
-import { CacheService } from 'src/common/services/cache.service';
-import { DatabaseService } from 'src/database/database.service';
+import { CacheService } from '../common/services/cache.service';
+import { DatabaseService } from '../database/database.service';
 import { RapidFireLessonOverviewDto } from './dto/lesson-detail.dto';
 import { RapidFireLessonStatDto } from './dto/lesson-stat.dto';
 import { OverallStatsDto } from './dto/overall-stats.dto';

@@ -1,7 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpException, HttpStatus, Post, Req, Res, UseGuards, ValidationPipe } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBody, ApiConflictResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiBody, ApiConflictResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Prisma } from '@prisma/client';
 import { Request, Response } from 'express';
 import { clearAuthCookies, setAuthCookies } from 'src/common/utils/cookie.helpers';
@@ -164,31 +164,11 @@ export class AuthController {
 
   @Get('me')
   @UseGuards(AuthGuard('jwt'))
-  async getCurrentUser(@Req() req) {
+  @ApiOperation({ summary: 'Get current authenticated user profile' })
+  @ApiBearerAuth()
+  @ApiResponse({ status: 200, description: 'User profile fetched successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async getCurrentUser(@Req() req: any) {
     return this.authService.getCurrentUser(req.user.id);
-  }
-
-  @Get('test-auth')
-  @ApiOperation({ summary: 'Test authentication middleware' })
-  @ApiResponse({ status: 200, description: 'Authentication status' })
-  async testAuth(@Req() req) {
-    if (req.user) {
-      return {
-        authenticated: true,
-        userId: req.user.id,
-        message: 'User is authenticated via middleware or JWT guard'
-      };
-    }
-    return {
-      authenticated: false,
-      message: 'User is not authenticated'
-    };
-  }
-
-  @Get('test')
-  @ApiOperation({ summary: 'Test route' })
-  @ApiResponse({ status: 200, description: 'Test message' })
-  async test() {
-    return 'Server is running...';
   }
 }

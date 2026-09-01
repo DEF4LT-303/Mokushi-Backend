@@ -53,7 +53,7 @@ export class CacheService {
 
   // Cleanup expired entries periodically
   startCleanupInterval(intervalMs: number = 60000): void {
-    setInterval(() => {
+    const interval = setInterval(() => {
       const now = Date.now();
       for (const [key, entry] of this.cache.entries()) {
         if (now > entry.expiresAt) {
@@ -61,5 +61,10 @@ export class CacheService {
         }
       }
     }, intervalMs);
+
+    // Unreference the timer so it does not block the Node.js event loop / Jest from exiting
+    if (interval && typeof interval.unref === 'function') {
+      interval.unref();
+    }
   }
 }
