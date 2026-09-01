@@ -1,8 +1,8 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
 import { JlptLevel } from '@prisma/client';
-import { CurrentUser } from 'src/auth/decorators/current-user.decorator';
-import { JwtGuard } from 'src/auth/guards/jwt.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { JwtGuard } from '../auth/guards/jwt.guard';
 import { RapidFireLessonOverviewDto } from './dto/lesson-detail.dto';
 import { SubmitRapidFireAnswersResponseDto } from './dto/rapid-fire-answer-response.dto';
 import { SubmitRapidFireAnswersDto } from './dto/rapid-fire-answer.dto';
