@@ -177,23 +177,19 @@ export class LeaderboardService {
     const cached = await this.cache.get(cacheKey);
     if (cached) return cached;
 
-    const categories = ['GRAMMAR', 'VOCABULARY', 'LISTENING'];
+    const [globalProgram, grammar, vocabulary, listening] = await Promise.all([
+      this.getGlobalLeaderboard(userId, jlptLevel),
+      this.getCategoryLeaderboard('GRAMMAR', userId, jlptLevel),
+      this.getCategoryLeaderboard('VOCABULARY', userId, jlptLevel),
+      this.getCategoryLeaderboard('LISTENING', userId, jlptLevel),
+    ]);
 
-    const result: any = {};
-
-    result['globalProgram'] =
-      await this.getGlobalLeaderboard(userId, jlptLevel);
-
-    for (const category of categories) {
-      result[
-        category.charAt(0).toLowerCase() +
-        category.slice(1).toLowerCase()
-      ] = await this.getCategoryLeaderboard(
-        category,
-        userId,
-        jlptLevel,
-      );
-    }
+    const result = {
+      globalProgram,
+      grammar,
+      vocabulary,
+      listening,
+    };
 
     await this.cache.set(cacheKey, result, 60);
     return result;

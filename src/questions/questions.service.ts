@@ -20,9 +20,23 @@ export class QuestionsService {
     take?: number;
   }) {
     const { moduleId, lessonId, questionType, skip, take } = params;
+
+    let resolvedModuleId = moduleId;
+
+    // If lessonId is specified, look up the lesson to find its moduleId
+    if (lessonId && !resolvedModuleId) {
+      const lesson = await this.databaseService.lesson.findUnique({
+        where: { id: lessonId },
+        select: { moduleId: true },
+      });
+      if (!lesson) {
+        return { count: 0, data: [] };
+      }
+      resolvedModuleId = lesson.moduleId;
+    }
+
     const where = {
-      moduleId: moduleId || undefined,
-      lessonId: lessonId || undefined,
+      moduleId: resolvedModuleId || undefined,
       questionType: questionType as QuestionType || undefined,
     };
 
