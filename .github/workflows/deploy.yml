@@ -4,12 +4,24 @@ on:
   push:
     branches:
       - production
+      - dev
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Set environment target
+        id: env_spec
+        run: |
+          if [ "${{ github.ref_name }}" = "production" ]; then
+            echo "app_dir=${{ secrets.PROD_APP_DIR }}" >> $GITHUB_OUTPUT
+            echo "pm2_name=backend-prod" >> $GITHUB_OUTPUT
+          else
+            echo "app_dir=${{ secrets.DEV_APP_DIR }}" >> $GITHUB_OUTPUT
+            echo "pm2_name=backend-dev" >> $GITHUB_OUTPUT
+          fi
+
       - name: SSH to VPS and deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -17,10 +29,10 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
-            cd ${{ secrets.APP_DIR }}
-            git pull origin production
-            npm install
+            cd ${{ steps.env_spec.outputs.app_dir }}
+            git pull origin ${{ github.ref_name }}
+            npm ci
             npx prisma generate
             npx prisma migrate deploy
             npm run build
-            pm2 restart mokushi-backend --update-env
+            PM2_NAME="${{ steps.env_spec.outputs.pm2_name }}" pm2 reload ecosystem.config.js --update-env || PM2_NAME="${{ steps.env_spec.outputs.pm2_name }}" pm2 start ecosystem.config.js --name "${{ steps.env_spec.outputs.pm2_name }}"
