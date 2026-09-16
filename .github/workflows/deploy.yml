@@ -31,7 +31,7 @@ jobs:
           script: |
             cd ${{ steps.env_spec.outputs.app_dir }}
             git pull origin ${{ github.ref_name }}
-            npm ci
+            npm install
             npx prisma generate
             npx prisma migrate deploy
             npm run build
