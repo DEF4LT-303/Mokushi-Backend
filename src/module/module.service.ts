@@ -15,24 +15,17 @@ export class ModuleService {
   async create(createModuleDto: CreateModuleDto) {
     const { quizConfigs, ...moduleData } = createModuleDto;
 
-    // Create module first
-    const module = await this.databaseService.module.create({
-      data: moduleData
-    });
-
-    // Create quiz configs if provided
-    if (quizConfigs && quizConfigs.length > 0) {
-      await this.databaseService.quizConfig.createMany({
-        data: quizConfigs.map(config => ({
-          ...config,
-          moduleId: module.id,
-        })),
-      });
-    }
-
-    // Return module with quiz configs
-    return this.databaseService.module.findUnique({
-      where: { id: module.id },
+    return this.databaseService.module.create({
+      data: {
+        ...moduleData,
+        ...(quizConfigs && quizConfigs.length > 0
+          ? {
+              quizConfigs: {
+                create: quizConfigs,
+              },
+            }
+          : {}),
+      },
       include: { quizConfigs: true, lessons: { include: { grammarRules: true } } },
     });
   }
@@ -85,25 +78,18 @@ export class ModuleService {
 
     const { quizConfigs, ...moduleData } = updateModuleDto;
 
-    // Update module fields
-    const updatedModule = await this.databaseService.module.update({
+    return this.databaseService.module.update({
       where: { id },
-      data: moduleData
-    });
-
-    // Add new quiz configs if provided
-    if (quizConfigs && quizConfigs.length > 0) {
-      await this.databaseService.quizConfig.createMany({
-        data: quizConfigs.map(config => ({
-          ...config,
-          moduleId: id,
-        })),
-      });
-    }
-
-    // Return module with quiz configs
-    return this.databaseService.module.findUnique({
-      where: { id },
+      data: {
+        ...moduleData,
+        ...(quizConfigs && quizConfigs.length > 0
+          ? {
+              quizConfigs: {
+                create: quizConfigs,
+              },
+            }
+          : {}),
+      },
       include: { quizConfigs: true, lessons: { include: { grammarRules: true } } },
     });
   }
@@ -260,17 +246,21 @@ export class ModuleService {
   }
 
   async getLessonsByModule(moduleId: string) {
-    const module = await this.databaseService.module.findUnique({ where: { id: moduleId } });
+    const moduleWithLessons = await this.databaseService.module.findUnique({
+      where: { id: moduleId },
+      include: {
+        lessons: {
+          include: { grammarRules: { include: { examples: true } } },
+          orderBy: { lessonNumber: 'asc' },
+        },
+      },
+    });
 
-    if (!module) {
+    if (!moduleWithLessons) {
       throw new NotFoundException(`Module with id '${moduleId}' not found`);
     }
 
-    return this.databaseService.lesson.findMany({
-      where: { moduleId },
-      include: { grammarRules: { include: { examples: true } } },
-      orderBy: { lessonNumber: 'asc' },
-    });
+    return moduleWithLessons.lessons;
   }
 
   async createLesson(moduleId: string, dto: CreateLessonDto) {
@@ -327,17 +317,21 @@ export class ModuleService {
   }
 
   async getRulesByLesson(lessonId: string) {
-    const lesson = await this.databaseService.lesson.findUnique({ where: { id: lessonId } });
+    const lessonWithRules = await this.databaseService.lesson.findUnique({
+      where: { id: lessonId },
+      include: {
+        grammarRules: {
+          include: { examples: true },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
 
-    if (!lesson) {
+    if (!lessonWithRules) {
       throw new NotFoundException(`Lesson with id '${lessonId}' not found`);
     }
 
-    return this.databaseService.grammarRule.findMany({
-      where: { lessonId },
-      include: { examples: true },
-      orderBy: { createdAt: 'asc' },
-    });
+    return lessonWithRules.grammarRules;
   }
 
   async createRule(lessonId: string, dto: CreateGrammarRuleDto) {

@@ -55,6 +55,11 @@ export class CreateModuleDto {
   @IsEnum(CategoryType)
   categoryType!: CategoryType;
 
+  @ApiPropertyOptional({ description: 'Optional Rule ID associated with this module' })
+  @IsOptional()
+  @IsString()
+  ruleId?: string;
+
   @ApiPropertyOptional({
     description: 'Optional array of quiz configurations to create with this module',
     type: [QuizConfigInputDto]

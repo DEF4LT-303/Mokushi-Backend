@@ -30,17 +30,20 @@ export class QuestionsController {
   @ApiOperation({ summary: 'Get questions with optional filters' })
   @ApiOkResponse({ description: 'List of questions with total count' })
   @ApiQuery({ name: 'moduleId', required: false })
+  @ApiQuery({ name: 'lessonId', required: false })
   @ApiQuery({ name: 'questionType', required: false, enum: ['GRAMMAR', 'VOCABULARY', 'KANJI'] })
   @ApiQuery({ name: 'skip', required: false })
   @ApiQuery({ name: 'take', required: false })
   findMany(
     @Query('moduleId') moduleId?: string,
+    @Query('lessonId') lessonId?: string,
     @Query('questionType') questionType?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
   ) {
     return this.questionsService.findMany({
       moduleId,
+      lessonId,
       questionType,
       skip: skip ? Number(skip) : undefined,
       take: take ? Number(take) : undefined,
