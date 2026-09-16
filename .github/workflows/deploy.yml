@@ -16,10 +16,10 @@ jobs:
         run: |
           if [ "${{ github.ref_name }}" = "production" ]; then
             echo "app_dir=${{ secrets.PROD_APP_DIR }}" >> $GITHUB_OUTPUT
-            echo "pm2_name=backend-prod" >> $GITHUB_OUTPUT
+            echo "pm2_name=mokushi-backend" >> $GITHUB_OUTPUT
           else
             echo "app_dir=${{ secrets.DEV_APP_DIR }}" >> $GITHUB_OUTPUT
-            echo "pm2_name=backend-dev" >> $GITHUB_OUTPUT
+            echo "pm2_name=mokushi-backend-dev" >> $GITHUB_OUTPUT
           fi
 
       - name: SSH to VPS and deploy
@@ -35,4 +35,4 @@ jobs:
             npx prisma generate
             npx prisma migrate deploy
             npm run build
-            PM2_NAME="${{ steps.env_spec.outputs.pm2_name }}" pm2 reload ecosystem.config.js --update-env || PM2_NAME="${{ steps.env_spec.outputs.pm2_name }}" pm2 start ecosystem.config.js --name "${{ steps.env_spec.outputs.pm2_name }}"
+            PM2_NAME="${{ steps.env_spec.outputs.pm2_name }}" pm2 restart ${{ steps.env_spec.outputs.pm2_name }} --update-env || PM2_NAME="${{ steps.env_spec.outputs.pm2_name }}" pm2 start ecosystem.config.js --name "${{ steps.env_spec.outputs.pm2_name }}"
