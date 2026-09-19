@@ -208,7 +208,7 @@ export class ModuleController {
   @ApiBearerAuth()
   @ApiOperation({
     summary:
-      "Submit quiz answers for a user attempt (this endpoint handles saving answers and calculating score)",
+      "Submit quiz answers for a user attempt",
   })
   @ApiBody({ type: SubmitQuizDto })
   @ApiUnauthorizedResponse({ description: "Unauthorized" })
@@ -235,7 +235,7 @@ export class ModuleController {
   @ApiBearerAuth()
   @ApiOperation({
     summary:
-      "Cancel an ongoing quiz attempt (deletes the attempt from database)",
+      "Cancel an ongoing quiz attempt",
   })
   @ApiBody({ type: CancelQuizDto })
   @ApiUnauthorizedResponse({ description: "Unauthorized" })
