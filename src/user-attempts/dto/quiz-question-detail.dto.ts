@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty } from "@nestjs/swagger";
 
 export class QuizQuestionDetailDto {
   @ApiProperty()
@@ -21,18 +21,18 @@ export class QuizQuestionDetailDto {
 }
 
 export class QuizResultItemDto {
-  @ApiProperty({ description: 'QuizQuestion ID' })
+  @ApiProperty({ description: "QuizQuestion ID" })
   quizQuestionId!: string;
 
   @ApiProperty({ type: QuizQuestionDetailDto })
   question!: QuizQuestionDetailDto;
 
-  @ApiProperty({ description: 'Answer provided by user' })
+  @ApiProperty({ description: "Answer provided by user" })
   userAnswer!: string | null;
 
-  @ApiProperty({ description: 'Correct answer' })
+  @ApiProperty({ description: "Correct answer" })
   correctAnswer!: string;
 
-  @ApiProperty({ description: 'Whether the answer was correct' })
+  @ApiProperty({ description: "Whether the answer was correct" })
   isCorrect!: boolean;
 }

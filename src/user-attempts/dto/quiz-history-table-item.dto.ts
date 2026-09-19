@@ -1,24 +1,29 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty } from "@nestjs/swagger";
 
 export class QuizHistoryTableItemDto {
-  @ApiProperty({ description: 'User attempt ID' })
+  @ApiProperty({ description: "User attempt ID" })
   id!: string;
 
-  @ApiProperty({ description: 'Quiz category (GRAMMAR, VOCABULARY, LISTENING)' })
+  @ApiProperty({
+    description: "Quiz category (GRAMMAR, VOCABULARY, LISTENING)",
+  })
   category!: string;
 
-  @ApiProperty({ description: 'ISO formatted date string' })
+  @ApiProperty({ description: "ISO formatted date string" })
   date!: string;
 
-  @ApiProperty({ description: 'Score achieved' })
+  @ApiProperty({ description: "Score achieved" })
   score!: number;
 
-  @ApiProperty({ description: 'Total questions in quiz' })
+  @ApiProperty({ description: "Total questions in quiz" })
   totalQuestions!: number;
 
-  @ApiProperty({ description: 'Time taken in seconds' })
+  @ApiProperty({ description: "Time taken in seconds" })
   timeTaken!: number;
 
-  @ApiProperty({ description: 'Performance label based on score', enum: ['EXCELLENT', 'GOOD', 'AVERAGE', 'NEEDS WORK', 'N/A'] })
+  @ApiProperty({
+    description: "Performance label based on score",
+    enum: ["EXCELLENT", "GOOD", "AVERAGE", "NEEDS WORK", "N/A"],
+  })
   performance!: string;
 }

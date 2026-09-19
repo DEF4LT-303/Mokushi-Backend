@@ -1,13 +1,13 @@
-import { createHash } from 'crypto';
+import { createHash } from "crypto";
 
 /**
  * Hashes a token string using SHA-256 and returns hex digest
  */
 export function hashToken(token: string): string {
-  if (!token || typeof token !== 'string') {
-    throw new Error('Invalid token provided for hashing');
+  if (!token || typeof token !== "string") {
+    throw new Error("Invalid token provided for hashing");
   }
-  return createHash('sha256').update(token).digest('hex');
+  return createHash("sha256").update(token).digest("hex");
 }
 
 /**
@@ -15,8 +15,8 @@ export function hashToken(token: string): string {
  * Throws error if format is unsupported or invalid
  */
 export function parseExpiryToDate(expiry: string): Date {
-  if (!expiry || typeof expiry !== 'string') {
-    throw new Error('Expiry must be a non-empty string');
+  if (!expiry || typeof expiry !== "string") {
+    throw new Error("Expiry must be a non-empty string");
   }
 
   const now = new Date();
@@ -26,13 +26,13 @@ export function parseExpiryToDate(expiry: string): Date {
     throw new Error(`Invalid number in expiry string: ${expiry}`);
   }
 
-  if (expiry.endsWith('d')) {
+  if (expiry.endsWith("d")) {
     now.setDate(now.getDate() + num);
-  } else if (expiry.endsWith('h')) {
+  } else if (expiry.endsWith("h")) {
     now.setHours(now.getHours() + num);
-  } else if (expiry.endsWith('m')) {
+  } else if (expiry.endsWith("m")) {
     now.setMinutes(now.getMinutes() + num);
-  } else if (expiry.endsWith('s')) {
+  } else if (expiry.endsWith("s")) {
     now.setSeconds(now.getSeconds() + num);
   } else {
     throw new Error(`Unsupported expiry format: ${expiry}`);

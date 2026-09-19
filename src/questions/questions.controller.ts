@@ -1,45 +1,71 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards, ValidationPipe } from '@nestjs/common';
-import { ApiBearerAuth, ApiBody, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
-import { Role } from '@prisma/client';
-import { Roles } from 'src/auth/decorators/roles.decorator';
-import { JwtGuard } from 'src/auth/guards/jwt.guard';
-import { RolesGuard } from 'src/auth/guards/roles.guard';
-import { CreateQuestionDto } from './dto/create-question.dto';
-import { UpdateQuestionDto } from './dto/update-question.dto';
-import { QuestionsService } from './questions.service';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  ValidationPipe,
+} from "@nestjs/common";
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiQuery,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from "@nestjs/swagger";
+import { Role } from "@prisma/client";
+import { Roles } from "src/auth/decorators/roles.decorator";
+import { JwtGuard } from "src/auth/guards/jwt.guard";
+import { RolesGuard } from "src/auth/guards/roles.guard";
+import { CreateQuestionDto } from "./dto/create-question.dto";
+import { UpdateQuestionDto } from "./dto/update-question.dto";
+import { QuestionsService } from "./questions.service";
 
-@ApiTags('Questions')
-@Controller('questions')
+@ApiTags("Questions")
+@Controller("questions")
 export class QuestionsController {
-  constructor(private readonly questionsService: QuestionsService) { }
+  constructor(private readonly questionsService: QuestionsService) {}
 
   @Post()
   @UseGuards(JwtGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new question' })
-  @ApiCreatedResponse({ description: 'Question created successfully' })
+  @ApiOperation({ summary: "Create a new question" })
+  @ApiCreatedResponse({ description: "Question created successfully" })
   @ApiBody({ type: CreateQuestionDto })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  @ApiForbiddenResponse({ description: 'Forbidden' })
+  @ApiUnauthorizedResponse({ description: "Unauthorized" })
+  @ApiForbiddenResponse({ description: "Forbidden" })
   create(@Body(ValidationPipe) createQuestionDto: CreateQuestionDto) {
     return this.questionsService.create(createQuestionDto);
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get questions with optional filters' })
-  @ApiOkResponse({ description: 'List of questions with total count' })
-  @ApiQuery({ name: 'moduleId', required: false })
-  @ApiQuery({ name: 'lessonId', required: false })
-  @ApiQuery({ name: 'questionType', required: false, enum: ['GRAMMAR', 'VOCABULARY', 'KANJI'] })
-  @ApiQuery({ name: 'skip', required: false })
-  @ApiQuery({ name: 'take', required: false })
+  @ApiOperation({ summary: "Get questions with optional filters" })
+  @ApiOkResponse({ description: "List of questions with total count" })
+  @ApiQuery({ name: "moduleId", required: false })
+  @ApiQuery({ name: "lessonId", required: false })
+  @ApiQuery({
+    name: "questionType",
+    required: false,
+    enum: ["GRAMMAR", "VOCABULARY", "KANJI"],
+  })
+  @ApiQuery({ name: "skip", required: false })
+  @ApiQuery({ name: "take", required: false })
   findMany(
-    @Query('moduleId') moduleId?: string,
-    @Query('lessonId') lessonId?: string,
-    @Query('questionType') questionType?: string,
-    @Query('skip') skip?: string,
-    @Query('take') take?: string,
+    @Query("moduleId") moduleId?: string,
+    @Query("lessonId") lessonId?: string,
+    @Query("questionType") questionType?: string,
+    @Query("skip") skip?: string,
+    @Query("take") take?: string,
   ) {
     return this.questionsService.findMany({
       moduleId,
@@ -50,52 +76,55 @@ export class QuestionsController {
     });
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get a question by ID' })
-  @ApiOkResponse({ description: 'Question fetched successfully' })
-  @ApiNotFoundResponse({ description: 'Question not found' })
-  findOne(@Param('id') id: string) {
+  @Get(":id")
+  @ApiOperation({ summary: "Get a question by ID" })
+  @ApiOkResponse({ description: "Question fetched successfully" })
+  @ApiNotFoundResponse({ description: "Question not found" })
+  findOne(@Param("id") id: string) {
     return this.questionsService.findOne(id);
   }
 
-  @Patch(':id')
+  @Patch(":id")
   @UseGuards(JwtGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update a question by ID' })
-  @ApiOkResponse({ description: 'Question updated successfully' })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  @ApiForbiddenResponse({ description: 'Forbidden' })
-  @ApiNotFoundResponse({ description: 'Question not found' })
-  update(@Param('id') id: string, @Body(ValidationPipe) updateQuestionDto: UpdateQuestionDto) {
+  @ApiOperation({ summary: "Update a question by ID" })
+  @ApiOkResponse({ description: "Question updated successfully" })
+  @ApiUnauthorizedResponse({ description: "Unauthorized" })
+  @ApiForbiddenResponse({ description: "Forbidden" })
+  @ApiNotFoundResponse({ description: "Question not found" })
+  update(
+    @Param("id") id: string,
+    @Body(ValidationPipe) updateQuestionDto: UpdateQuestionDto,
+  ) {
     return this.questionsService.update(id, updateQuestionDto);
   }
 
-  @Delete(':id')
+  @Delete(":id")
   @UseGuards(JwtGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete a question by ID' })
-  @ApiOkResponse({ description: 'Question deleted successfully' })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  @ApiForbiddenResponse({ description: 'Forbidden' })
-  @ApiNotFoundResponse({ description: 'Question not found' })
-  remove(@Param('id') id: string) {
+  @ApiOperation({ summary: "Delete a question by ID" })
+  @ApiOkResponse({ description: "Question deleted successfully" })
+  @ApiUnauthorizedResponse({ description: "Unauthorized" })
+  @ApiForbiddenResponse({ description: "Forbidden" })
+  @ApiNotFoundResponse({ description: "Question not found" })
+  remove(@Param("id") id: string) {
     return this.questionsService.remove(id);
   }
 
-  @Delete('module/:moduleId')
+  @Delete("module/:moduleId")
   @UseGuards(JwtGuard, RolesGuard)
   @Roles(Role.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete all questions by module ID' })
-  @ApiOkResponse({ description: 'Questions deleted successfully (returns deleted count)' })
-  @ApiUnauthorizedResponse({ description: 'Unauthorized' })
-  @ApiForbiddenResponse({ description: 'Forbidden' })
-  @ApiNotFoundResponse({ description: 'Module not found' })
-  deleteByModule(@Param('moduleId') moduleId: string) {
+  @ApiOperation({ summary: "Delete all questions by module ID" })
+  @ApiOkResponse({
+    description: "Questions deleted successfully (returns deleted count)",
+  })
+  @ApiUnauthorizedResponse({ description: "Unauthorized" })
+  @ApiForbiddenResponse({ description: "Forbidden" })
+  @ApiNotFoundResponse({ description: "Module not found" })
+  deleteByModule(@Param("moduleId") moduleId: string) {
     return this.questionsService.removeByModule(moduleId);
   }
 }
-
-

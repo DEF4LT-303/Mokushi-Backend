@@ -1,10 +1,14 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { UserAttemptsService } from './user-attempts.service';
-import { DatabaseService } from 'src/database/database.service';
-import { LeaderboardService } from 'src/leaderboard/leaderboard.service';
-import { NotFoundException } from '@nestjs/common';
+import { Test, TestingModule } from "@nestjs/testing";
+import { UserAttemptsService } from "./user-attempts.service";
+import { DatabaseService } from "src/database/database.service";
+import { LeaderboardService } from "src/leaderboard/leaderboard.service";
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
 
-describe('UserAttemptsService', () => {
+describe("UserAttemptsService", () => {
   let service: UserAttemptsService;
   let databaseService: any;
   let leaderboardService: any;
@@ -17,6 +21,7 @@ describe('UserAttemptsService', () => {
         findUnique: jest.fn(),
         findMany: jest.fn(),
         count: jest.fn(),
+        delete: jest.fn(),
       },
       userAnswer: {
         createMany: jest.fn(),
@@ -28,7 +33,7 @@ describe('UserAttemptsService', () => {
         findMany: jest.fn(),
       },
       $transaction: jest.fn().mockImplementation((val) => {
-        if (typeof val === 'function') {
+        if (typeof val === "function") {
           return val(databaseService);
         }
         return val;
@@ -56,25 +61,98 @@ describe('UserAttemptsService', () => {
     service = module.get<UserAttemptsService>(UserAttemptsService);
   });
 
-  it('should be defined', () => {
+  it("should be defined", () => {
     expect(service).toBeDefined();
   });
 
-  describe('createAttempt', () => {
-    it('should create a new attempt with score 0 and completed false', async () => {
-      const dto: any = { userId: 'user-1', quizId: 'quiz-1' };
-      databaseService.userAttempt.create.mockResolvedValue({ id: 'att-1', ...dto, score: 0, completed: false });
+  describe("createAttempt", () => {
+    it("should create a new attempt with score 0 and status ONGOING", async () => {
+      const dto: any = { userId: "user-1", quizId: "quiz-1" };
+      databaseService.userAttempt.create.mockResolvedValue({
+        id: "att-1",
+        ...dto,
+        score: 0,
+        status: "ONGOING",
+      });
 
       const result = await service.createAttempt(dto);
       expect(result.score).toBe(0);
-      expect(result.completed).toBe(false);
+      expect(result.status).toBe("ONGOING");
     });
   });
 
-  describe('submitQuizAnswers', () => {
-    it('should throw NotFoundException if attempt is not found', async () => {
+  describe("submitQuizAnswers", () => {
+    it("should throw NotFoundException if attempt is not found", async () => {
       databaseService.userAttempt.findUnique.mockResolvedValue(null);
-      await expect(service.submitQuizAnswers('invalid-att', [])).rejects.toThrow(NotFoundException);
+      await expect(
+        service.submitQuizAnswers("invalid-att", []),
+      ).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe("cancelAttempt", () => {
+    it("should throw NotFoundException if attempt is not found", async () => {
+      databaseService.userAttempt.findUnique.mockResolvedValue(null);
+      await expect(
+        service.cancelAttempt("invalid-att", "user-1"),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should throw ForbiddenException if user is not the owner of the attempt", async () => {
+      databaseService.userAttempt.findUnique.mockResolvedValue({
+        id: "att-1",
+        userId: "user-2",
+        status: "ONGOING",
+      });
+      await expect(service.cancelAttempt("att-1", "user-1")).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it("should throw BadRequestException if attempt is already completed", async () => {
+      databaseService.userAttempt.findUnique.mockResolvedValue({
+        id: "att-1",
+        userId: "user-1",
+        status: "COMPLETED",
+      });
+      await expect(service.cancelAttempt("att-1", "user-1")).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("should throw BadRequestException if attempt is already cancelled", async () => {
+      databaseService.userAttempt.findUnique.mockResolvedValue({
+        id: "att-1",
+        userId: "user-1",
+        status: "CANCELLED",
+      });
+      await expect(service.cancelAttempt("att-1", "user-1")).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("should update attempt status to CANCELLED if all validations pass", async () => {
+      databaseService.userAttempt.findUnique.mockResolvedValue({
+        id: "att-1",
+        userId: "user-1",
+        status: "ONGOING",
+      });
+      databaseService.userAttempt.update.mockResolvedValue({
+        id: "att-1",
+        status: "CANCELLED",
+      });
+
+      const result = await service.cancelAttempt("att-1", "user-1");
+      expect(databaseService.userAttempt.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "att-1" },
+          data: expect.objectContaining({ status: "CANCELLED" }),
+        }),
+      );
+      expect(result).toEqual({
+        success: true,
+        message: "Quiz attempt cancelled successfully",
+      });
     });
   });
 });

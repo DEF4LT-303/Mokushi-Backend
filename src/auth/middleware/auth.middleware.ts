@@ -1,15 +1,19 @@
-import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { NextFunction, Request, Response } from 'express';
-import { hashToken } from 'src/common/utils/jwt.helpers';
-import { DatabaseService } from 'src/database/database.service';
+import {
+  Injectable,
+  NestMiddleware,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { NextFunction, Request, Response } from "express";
+import { hashToken } from "src/common/utils/jwt.helpers";
+import { DatabaseService } from "src/database/database.service";
 
 @Injectable()
 export class AuthMiddleware implements NestMiddleware {
   constructor(
     private readonly jwtService: JwtService,
     private readonly databaseService: DatabaseService,
-  ) { }
+  ) {}
 
   async use(req: Request, res: Response, next: NextFunction) {
     const accessToken = req.cookies?.access_token;
@@ -33,8 +37,8 @@ export class AuthMiddleware implements NestMiddleware {
 
       if (!refreshToken) {
         // No refresh token, clear cookies and continue
-        res.clearCookie('access_token', { path: '/' });
-        res.clearCookie('refresh_token', { path: '/' });
+        res.clearCookie("access_token", { path: "/" });
+        res.clearCookie("refresh_token", { path: "/" });
         return next();
       }
 
@@ -60,23 +64,23 @@ export class AuthMiddleware implements NestMiddleware {
         });
 
         if (!storedToken) {
-          throw new UnauthorizedException('Invalid refresh token');
+          throw new UnauthorizedException("Invalid refresh token");
         }
 
         // Generate new access token
         const newAccessToken = this.jwtService.sign(
           { sub: userId },
-          { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m' }
+          { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m" },
         );
 
         // Set new access token cookie
-        const isProduction = process.env.NODE_ENV === 'production';
-        res.cookie('access_token', newAccessToken, {
+        const isProduction = process.env.NODE_ENV === "production";
+        res.cookie("access_token", newAccessToken, {
           httpOnly: true,
           secure: isProduction,
-          sameSite: isProduction ? 'strict' : 'lax',
+          sameSite: isProduction ? "strict" : "lax",
           maxAge: 15 * 60 * 1000, // 15 minutes
-          path: '/',
+          path: "/",
         });
 
         // Set user in request and continue - JWT strategy will handle user data
@@ -84,8 +88,8 @@ export class AuthMiddleware implements NestMiddleware {
         return next();
       } catch (refreshError) {
         // Refresh token is invalid, clear cookies and continue
-        res.clearCookie('access_token', { path: '/' });
-        res.clearCookie('refresh_token', { path: '/' });
+        res.clearCookie("access_token", { path: "/" });
+        res.clearCookie("refresh_token", { path: "/" });
         return next();
       }
     }

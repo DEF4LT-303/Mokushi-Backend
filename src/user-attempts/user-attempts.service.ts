@@ -1,34 +1,80 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { DatabaseService } from 'src/database/database.service';
-import { LeaderboardService } from 'src/leaderboard/leaderboard.service';
-import { CreateUserAnswerDto } from './dto/create-user-answer.dto';
-import { CreateUserAttemptDto } from './dto/create-user-attempt.dto';
-import { UpdateUserAttemptDto } from './dto/update-user-attempt.dto';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { DatabaseService } from "src/database/database.service";
+import { LeaderboardService } from "src/leaderboard/leaderboard.service";
+import { CreateUserAnswerDto } from "./dto/create-user-answer.dto";
+import { CreateUserAttemptDto } from "./dto/create-user-attempt.dto";
+import { UpdateUserAttemptDto } from "./dto/update-user-attempt.dto";
 
 @Injectable()
 export class UserAttemptsService {
   private readonly submissionGracePeriodMs = (() => {
     const envValue = process.env.QUIZ_GRACE_PERDIOD;
     if (!envValue) return 10_000;
-    const parsed = parseInt(envValue.replace(/_/g, ''), 10);
+    const parsed = parseInt(envValue.replace(/_/g, ""), 10);
     return Number.isNaN(parsed) ? 10_000 : parsed;
   })();
 
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly leaderboardService: LeaderboardService,
-  ) { }
+  ) {}
 
-  private async invalidateLeaderboardCache(userId?: string | null, moduleId?: string | null, jlptLevel?: string) {
+  private async invalidateLeaderboardCache(
+    userId?: string | null,
+    moduleId?: string | null,
+    jlptLevel?: string,
+  ) {
     if (moduleId || jlptLevel) {
-      await this.leaderboardService.onAttemptCompleted(userId, moduleId, jlptLevel);
+      await this.leaderboardService.onAttemptCompleted(
+        userId,
+        moduleId,
+        jlptLevel,
+      );
     }
   }
 
   async createAttempt(dto: CreateUserAttemptDto) {
     return this.databaseService.userAttempt.create({
-      data: { ...dto, score: 0, completed: false }
+      data: { ...dto, score: 0, status: 'ONGOING' },
     });
+  }
+
+  async cancelAttempt(userAttemptId: string, userId: string) {
+    const attempt = await this.databaseService.userAttempt.findUnique({
+      where: { id: userAttemptId },
+    });
+
+    if (!attempt) {
+      throw new NotFoundException(
+        `User attempt with id '${userAttemptId}' not found`,
+      );
+    }
+
+    if (attempt.userId !== userId) {
+      throw new ForbiddenException(
+        `You do not have permission to cancel this attempt`,
+      );
+    }
+
+    if (attempt.status === 'COMPLETED') {
+      throw new BadRequestException(`Cannot cancel a completed quiz attempt`);
+    }
+
+    if (attempt.status === 'CANCELLED') {
+      throw new BadRequestException(`Quiz attempt is already cancelled`);
+    }
+
+    await this.databaseService.userAttempt.update({
+      where: { id: userAttemptId },
+      data: { status: 'CANCELLED', submittedAt: new Date() },
+    });
+
+    return { success: true, message: "Quiz attempt cancelled successfully" };
   }
 
   async updateAttempt(id: string, dto: UpdateUserAttemptDto) {
@@ -40,9 +86,12 @@ export class UserAttemptsService {
       },
     });
 
-    // Invalidate leaderboard cache if score or completed status changed
-    if (dto.score !== undefined || dto.completed !== undefined) {
-      await this.invalidateLeaderboardCache(updatedAttempt.userId, updatedAttempt.quiz.moduleId);
+    // Invalidate leaderboard cache if score or status changed
+    if (dto.score !== undefined || dto.status !== undefined) {
+      await this.invalidateLeaderboardCache(
+        updatedAttempt.userId,
+        updatedAttempt.quiz.moduleId,
+      );
     }
 
     return updatedAttempt;
@@ -50,7 +99,7 @@ export class UserAttemptsService {
 
   createUserAnswers(attemptId: string, answers: CreateUserAnswerDto[]) {
     return this.databaseService.userAnswer.createMany({
-      data: answers.map(ans => ({
+      data: answers.map((ans) => ({
         userAttemptId: attemptId,
         quizQuestionId: ans.quizQuestionId,
         answer: ans.answer,
@@ -60,23 +109,32 @@ export class UserAttemptsService {
   }
 
   async calculateScore(userAttemptId: string) {
-    const answers = await this.databaseService.userAnswer.findMany({ where: { userAttemptId } });
-    const score = answers.filter(ans => ans.correct).length;
+    const answers = await this.databaseService.userAnswer.findMany({
+      where: { userAttemptId },
+    });
+    const score = answers.filter((ans) => ans.correct).length;
     const updatedAttempt = await this.databaseService.userAttempt.update({
       where: { id: userAttemptId },
-      data: { score, completed: true },
+      data: { score, status: 'COMPLETED' },
       include: {
         quiz: true,
       },
     });
 
     // Invalidate leaderboard cache since score/completed are updated
-    await this.invalidateLeaderboardCache(updatedAttempt.userId, updatedAttempt.quiz.moduleId, updatedAttempt.quiz.jlptLevel);
+    await this.invalidateLeaderboardCache(
+      updatedAttempt.userId,
+      updatedAttempt.quiz.moduleId,
+      updatedAttempt.quiz.jlptLevel,
+    );
 
     return score;
   }
 
-  async submitQuizAnswers(userAttemptId: string, answers: { quizQuestionId: string, answer: string }[]) {
+  async submitQuizAnswers(
+    userAttemptId: string,
+    answers: { quizQuestionId: string; answer: string }[],
+  ) {
     // Fetch the attempt with quiz and config to check timing
     const attempt = await this.databaseService.userAttempt.findUnique({
       where: { id: userAttemptId },
@@ -90,14 +148,16 @@ export class UserAttemptsService {
     });
 
     if (!attempt) {
-      throw new NotFoundException(`User attempt with id '${userAttemptId}' not found`);
+      throw new NotFoundException(
+        `User attempt with id '${userAttemptId}' not found`,
+      );
     }
 
-    if (attempt.completed) {
+    if (attempt.status === 'COMPLETED') {
       const existingAnswers = await this.databaseService.userAnswer.findMany({
         where: { userAttemptId },
       });
-      const completedScore = existingAnswers.filter(a => a.correct).length;
+      const completedScore = existingAnswers.filter((a) => a.correct).length;
       const totalQuestions = await this.databaseService.quizQuestion.count({
         where: { quizId: attempt.quizId },
       });
@@ -106,14 +166,27 @@ export class UserAttemptsService {
         alreadySubmitted: true,
         score: completedScore,
         totalQuestions,
-        timeTaken: this.getTimeTakenSeconds(attempt.startedAt, attempt.submittedAt),
+        timeTaken: this.getTimeTakenSeconds(
+          attempt.startedAt,
+          attempt.submittedAt,
+        ),
         results: [],
       };
     }
 
+    if (attempt.status === 'CANCELLED') {
+      throw new BadRequestException(
+        'Cannot submit answers for a cancelled quiz attempt',
+      );
+    }
+
     // Check if time limit has expired
     if (attempt.quiz.quizConfig) {
-      const deadline = new Date(attempt.startedAt.getTime() + attempt.quiz.quizConfig.durationSec * 1000 + this.submissionGracePeriodMs);
+      const deadline = new Date(
+        attempt.startedAt.getTime() +
+          attempt.quiz.quizConfig.durationSec * 1000 +
+          this.submissionGracePeriodMs,
+      );
       const now = new Date();
 
       if (now > deadline) {
@@ -121,19 +194,25 @@ export class UserAttemptsService {
         const existingAnswers = await this.databaseService.userAnswer.findMany({
           where: { userAttemptId },
         });
-        const expiredScore = existingAnswers.filter(a => a.correct).length;
+        const expiredScore = existingAnswers.filter((a) => a.correct).length;
         const updatedAttempt = await this.databaseService.userAttempt.update({
           where: { id: userAttemptId },
-          data: { completed: true, score: expiredScore, submittedAt: now },
+          data: { status: 'COMPLETED', score: expiredScore, submittedAt: now },
           include: {
             quiz: true,
           },
         });
 
         // Invalidate leaderboard cache and broadcast updates
-        await this.invalidateLeaderboardCache(updatedAttempt.userId, updatedAttempt.quiz.moduleId, updatedAttempt.quiz.jlptLevel);
+        await this.invalidateLeaderboardCache(
+          updatedAttempt.userId,
+          updatedAttempt.quiz.moduleId,
+          updatedAttempt.quiz.jlptLevel,
+        );
 
-        throw new NotFoundException('Quiz time limit has expired. Your attempt has been automatically submitted.');
+        throw new NotFoundException(
+          "Quiz time limit has expired. Your attempt has been automatically submitted.",
+        );
       }
     }
 
@@ -145,10 +224,12 @@ export class UserAttemptsService {
     });
 
     // Create a map for quick lookup of submitted answers
-    const answersMap = new Map(answers.map(a => [a.quizQuestionId, a.answer]));
+    const answersMap = new Map(
+      answers.map((a) => [a.quizQuestionId, a.answer]),
+    );
 
     // Validate all questions and create answer records
-    const userAnswersToSave = allQuizQuestions.map(qq => {
+    const userAnswersToSave = allQuizQuestions.map((qq) => {
       const userAnswer = answersMap.get(qq.id);
       const isCorrect = userAnswer === qq.question.correctAnswer;
       return {
@@ -159,27 +240,34 @@ export class UserAttemptsService {
       };
     });
 
-    const score = userAnswersToSave.filter(a => a.correct).length;
+    const score = userAnswersToSave.filter((a) => a.correct).length;
     const submittedAt = new Date();
 
     // Get total questions from quizConfig or actual quiz questions
     const totalQuestions = allQuizQuestions.length;
-    const normalizedScore = totalQuestions > 0
-      ? parseFloat(((score / totalQuestions) * 100).toFixed(2))
-      : 0;
+    const normalizedScore =
+      totalQuestions > 0
+        ? parseFloat(((score / totalQuestions) * 100).toFixed(2))
+        : 0;
 
-    const updatedAttempt = await this.databaseService.$transaction(async (tx) => {
-      await tx.userAnswer.deleteMany({ where: { userAttemptId } });
-      await tx.userAnswer.createMany({ data: userAnswersToSave });
+    const updatedAttempt = await this.databaseService.$transaction(
+      async (tx) => {
+        await tx.userAnswer.deleteMany({ where: { userAttemptId } });
+        await tx.userAnswer.createMany({ data: userAnswersToSave });
 
-      return tx.userAttempt.update({
-        where: { id: userAttemptId },
-        data: { score, normalizedScore, completed: true, submittedAt },
-        include: { quiz: true },
-      });
-    });
+        return tx.userAttempt.update({
+          where: { id: userAttemptId },
+          data: { score, normalizedScore, status: 'COMPLETED', submittedAt },
+          include: { quiz: true },
+        });
+      },
+    );
 
-    await this.invalidateLeaderboardCache(updatedAttempt.userId, updatedAttempt.quiz.moduleId, updatedAttempt.quiz.jlptLevel);
+    await this.invalidateLeaderboardCache(
+      updatedAttempt.userId,
+      updatedAttempt.quiz.moduleId,
+      updatedAttempt.quiz.jlptLevel,
+    );
 
     // Build detailed results with full question data for all questions
     const results = allQuizQuestions.map((qq) => {
@@ -209,7 +297,10 @@ export class UserAttemptsService {
     };
   }
 
-  private getTimeTakenSeconds(startedAt: Date, submittedAt?: Date | null): number {
+  private getTimeTakenSeconds(
+    startedAt: Date,
+    submittedAt?: Date | null,
+  ): number {
     if (!submittedAt) {
       return 0;
     }
@@ -218,17 +309,22 @@ export class UserAttemptsService {
   }
 
   private getPerformanceLabel(score: number, totalQuestions: number): string {
-    if (totalQuestions === 0) return 'N/A';
+    if (totalQuestions === 0) return "N/A";
     const pct = (score / totalQuestions) * 100;
-    if (pct >= 70) return 'EXCELLENT';
-    if (pct >= 40) return 'GOOD';
-    return 'POOR';
+    if (pct >= 70) return "EXCELLENT";
+    if (pct >= 40) return "GOOD";
+    return "POOR";
   }
 
-  async getQuizHistory(userId: string, limit?: number, offset?: number, categoryType?: string) {
+  async getQuizHistory(
+    userId: string,
+    limit?: number,
+    offset?: number,
+    categoryType?: string,
+  ) {
     const whereClause: any = {
       userId,
-      completed: true,
+      status: 'COMPLETED',
     };
 
     if (categoryType) {
@@ -251,7 +347,7 @@ export class UserAttemptsService {
           },
         },
       },
-      orderBy: { submittedAt: 'desc' },
+      orderBy: { submittedAt: "desc" },
     };
 
     if (limit !== undefined) {
@@ -266,32 +362,36 @@ export class UserAttemptsService {
       where: whereClause,
     });
 
-    const attempts = await this.databaseService.userAttempt.findMany(queryOptions) as any[];
+    const attempts = (await this.databaseService.userAttempt.findMany(
+      queryOptions,
+    )) as any[];
 
-    const quizIds = [...new Set(attempts.map(a => a.quizId))];
+    const quizIds = [...new Set(attempts.map((a) => a.quizId))];
 
     const questionCounts = await this.databaseService.quizQuestion.groupBy({
-      by: ['quizId'],
+      by: ["quizId"],
       where: { quizId: { in: quizIds } },
       _count: { _all: true },
     });
 
     const countMap = new Map(
-      questionCounts.map(q => [q.quizId, q._count._all]),
+      questionCounts.map((q) => [q.quizId, q._count._all]),
     );
 
-    const data = attempts.map(attempt => {
+    const data = attempts.map((attempt) => {
       const totalQuestions = countMap.get(attempt.quizId) ?? 0;
 
       return {
         id: attempt.id,
-        category: attempt.quiz.module?.categoryType ?? 'UNKNOWN',
+        category: attempt.quiz.module?.categoryType ?? "UNKNOWN",
         date:
-          attempt.submittedAt?.toISOString() ??
-          attempt.startedAt.toISOString(),
+          attempt.submittedAt?.toISOString() ?? attempt.startedAt.toISOString(),
         score: attempt.score,
         totalQuestions,
-        timeTaken: this.getTimeTakenSeconds(attempt.startedAt, attempt.submittedAt),
+        timeTaken: this.getTimeTakenSeconds(
+          attempt.startedAt,
+          attempt.submittedAt,
+        ),
         performance: this.getPerformanceLabel(attempt.score, totalQuestions),
       };
     });
@@ -325,11 +425,15 @@ export class UserAttemptsService {
     });
 
     if (!attempt) {
-      throw new NotFoundException(`User attempt with id '${userAttemptId}' not found`);
+      throw new NotFoundException(
+        `User attempt with id '${userAttemptId}' not found`,
+      );
     }
 
-    if (!attempt.completed) {
-      throw new NotFoundException('This quiz attempt has not been completed yet');
+    if (attempt.status !== 'COMPLETED') {
+      throw new NotFoundException(
+        "This quiz attempt has not been completed yet",
+      );
     }
 
     const totalQuestions = await this.databaseService.quizQuestion.count({
@@ -337,7 +441,7 @@ export class UserAttemptsService {
     });
 
     // Build results with detailed question info
-    const results = attempt.userAnswers.map(ua => ({
+    const results = attempt.userAnswers.map((ua) => ({
       quizQuestionId: ua.quizQuestionId,
       question: {
         id: ua.quizQuestion.question.id,
@@ -358,7 +462,10 @@ export class UserAttemptsService {
         quizDate: attempt.submittedAt || attempt.startedAt,
         score: attempt.score,
         totalQuestions,
-        timeTaken: this.getTimeTakenSeconds(attempt.startedAt, attempt.submittedAt),
+        timeTaken: this.getTimeTakenSeconds(
+          attempt.startedAt,
+          attempt.submittedAt,
+        ),
         results,
       },
     };

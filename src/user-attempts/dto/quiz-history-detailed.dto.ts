@@ -1,17 +1,20 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { QuizResultItemDto } from './quiz-question-detail.dto';
+import { ApiProperty } from "@nestjs/swagger";
+import { QuizResultItemDto } from "./quiz-question-detail.dto";
 
 export class QuizHistorySubmissionDto {
-  @ApiProperty({ description: 'Score achieved' })
+  @ApiProperty({ description: "Score achieved" })
   score!: number;
 
-  @ApiProperty({ description: 'Total questions in quiz' })
+  @ApiProperty({ description: "Total questions in quiz" })
   totalQuestions!: number;
 
-  @ApiProperty({ description: 'Time taken in seconds' })
+  @ApiProperty({ description: "Time taken in seconds" })
   timeTaken!: number;
 
-  @ApiProperty({ type: [QuizResultItemDto], description: 'Detailed results for each question' })
+  @ApiProperty({
+    type: [QuizResultItemDto],
+    description: "Detailed results for each question",
+  })
   results!: QuizResultItemDto[];
 }
 
@@ -22,6 +25,6 @@ export class QuizHistoryDetailedDto {
   @ApiProperty({ type: QuizHistorySubmissionDto })
   submission!: QuizHistorySubmissionDto;
 
-  @ApiProperty({ description: 'ISO date string' })
+  @ApiProperty({ description: "ISO date string" })
   date!: Date;
 }

@@ -18,8 +18,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_ACCESS_SECRET || 'default',
-    })
+      secretOrKey: process.env.JWT_ACCESS_SECRET || "default",
+    });
   }
 
   async validate(payload: any) {
@@ -42,7 +42,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (user) {
       return user as SafeUser;
     }
-    
+
     // Fallback to just userId if user not found
     return {
       userId: payload.sub,
