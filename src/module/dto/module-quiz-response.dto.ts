@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { QuizResponseDto } from './quiz-response.dto';
+import { ApiProperty } from "@nestjs/swagger";
+import { QuizResponseDto } from "./quiz-response.dto";
 
 export class ModuleInfoDto {
   @ApiProperty()

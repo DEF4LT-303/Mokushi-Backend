@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
-import { hashToken, parseExpiryToDate } from 'src/common/utils/jwt.helpers';
-import { DatabaseService } from 'src/database/database.service';
-import { UsersService } from 'src/users/users.service';
-import { AuthPayloadDto } from './dto/auth.dto';
+import { Injectable } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import * as bcrypt from "bcrypt";
+import { hashToken, parseExpiryToDate } from "src/common/utils/jwt.helpers";
+import { DatabaseService } from "src/database/database.service";
+import { UsersService } from "src/users/users.service";
+import { AuthPayloadDto } from "./dto/auth.dto";
 
 @Injectable()
 export class AuthService {
@@ -12,7 +12,7 @@ export class AuthService {
     private readonly databaseService: DatabaseService,
     private readonly jwtService: JwtService,
     private readonly usersService: UsersService,
-  ) { }
+  ) {}
 
   async validateUser(authPayloadDto: AuthPayloadDto) {
     const { email, password } = authPayloadDto;
@@ -24,7 +24,9 @@ export class AuthService {
     if (!user) return null;
 
     if (!user.password) {
-      throw new Error('This account is linked to a third-party provider. Please use the respective OAuth login method.');
+      throw new Error(
+        "This account is linked to a third-party provider. Please use the respective OAuth login method.",
+      );
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -36,20 +38,22 @@ export class AuthService {
   async generateTokensAndSave(userId: string) {
     const accessToken = this.jwtService.sign(
       { sub: userId },
-      { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || '15m' }
+      { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m" },
     );
 
     const refreshToken = this.jwtService.sign(
       { sub: userId },
       {
-        expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d',
-        secret: process.env.JWT_REFRESH_SECRET
-      }
+        expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || "7d",
+        secret: process.env.JWT_REFRESH_SECRET,
+      },
     );
 
     const hashedToken = hashToken(refreshToken);
 
-    const expiresAt = parseExpiryToDate(process.env.JWT_REFRESH_EXPIRES_IN || '7d');
+    const expiresAt = parseExpiryToDate(
+      process.env.JWT_REFRESH_EXPIRES_IN || "7d",
+    );
 
     await this.databaseService.refreshToken.create({
       data: {
@@ -91,7 +95,7 @@ export class AuthService {
     });
 
     if (!storedToken) {
-      throw new Error('Invalid or expired refresh token');
+      throw new Error("Invalid or expired refresh token");
     }
 
     // Revoke old token
@@ -128,9 +132,9 @@ export class AuthService {
         data: { revoked: true },
       });
 
-      return { message: 'Logged out successfully' };
+      return { message: "Logged out successfully" };
     } catch {
-      throw new Error('Invalid refresh token');
+      throw new Error("Invalid refresh token");
     }
   }
 
@@ -150,19 +154,20 @@ export class AuthService {
   async getCurrentUser(userId: string) {
     try {
       if (!userId) {
-        throw new Error('User ID is required');
+        throw new Error("User ID is required");
       }
 
       const user = await this.usersService.findById(userId);
 
       if (!user) {
-        throw new Error('User not found');
+        throw new Error("User not found");
       }
 
       return user;
     } catch (error) {
-      throw new Error(error instanceof Error ? error.message : 'Failed to retrieve user');
+      throw new Error(
+        error instanceof Error ? error.message : "Failed to retrieve user",
+      );
     }
   }
 }
-

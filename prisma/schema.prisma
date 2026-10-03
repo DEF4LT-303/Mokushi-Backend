@@ -327,6 +327,12 @@ model QuizQuestion {
   @@index([questionId])
 }
 
+enum UserAttemptStatus {
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
 model UserAttempt {
   id String @id @default(uuid())
 
@@ -340,8 +346,8 @@ model UserAttempt {
 
   score           Int
   normalizedScore Float?
-  completed       Boolean   @default(false)
-  startedAt       DateTime  @default(now())
+  status          UserAttemptStatus @default(ONGOING)
+  startedAt       DateTime          @default(now())
   submittedAt     DateTime?
 
   createdAt DateTime @default(now())

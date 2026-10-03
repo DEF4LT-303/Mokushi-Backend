@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 
 interface CacheEntry {
   value: any;
@@ -63,7 +63,7 @@ export class CacheService {
     }, intervalMs);
 
     // Unreference the timer so it does not block the Node.js event loop / Jest from exiting
-    if (interval && typeof interval.unref === 'function') {
+    if (interval && typeof interval.unref === "function") {
       interval.unref();
     }
   }

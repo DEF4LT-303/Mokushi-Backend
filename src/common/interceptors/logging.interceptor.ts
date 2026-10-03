@@ -4,8 +4,8 @@ import {
   Injectable,
   Logger,
   NestInterceptor,
-} from '@nestjs/common';
-import { Observable, tap } from 'rxjs';
+} from "@nestjs/common";
+import { Observable, tap } from "rxjs";
 
 @Injectable()
 export class LoggingInterceptor implements NestInterceptor {
@@ -23,7 +23,7 @@ export class LoggingInterceptor implements NestInterceptor {
         const status = res.statusCode;
 
         this.logger.log(
-          `[${method}] ${url} -> ${status} - ${Date.now() - now}ms`
+          `[${method}] ${url} -> ${status} - ${Date.now() - now}ms`,
         );
       }),
     );

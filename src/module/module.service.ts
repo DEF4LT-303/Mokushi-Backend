@@ -1,16 +1,16 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { CategoryType, JlptLevel } from '@prisma/client';
-import { DatabaseService } from 'src/database/database.service';
-import { CreateGrammarRuleDto } from './dto/create-grammar-rule.dto';
-import { CreateLessonDto } from './dto/create-lesson.dto';
-import { CreateModuleDto } from './dto/create-module.dto';
-import { UpdateGrammarRuleDto } from './dto/update-grammar-rule.dto';
-import { UpdateLessonDto } from './dto/update-lesson.dto';
-import { UpdateModuleDto } from './dto/update-module.dto';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { CategoryType, JlptLevel } from "@prisma/client";
+import { DatabaseService } from "src/database/database.service";
+import { CreateGrammarRuleDto } from "./dto/create-grammar-rule.dto";
+import { CreateLessonDto } from "./dto/create-lesson.dto";
+import { CreateModuleDto } from "./dto/create-module.dto";
+import { UpdateGrammarRuleDto } from "./dto/update-grammar-rule.dto";
+import { UpdateLessonDto } from "./dto/update-lesson.dto";
+import { UpdateModuleDto } from "./dto/update-module.dto";
 
 @Injectable()
 export class ModuleService {
-  constructor(private readonly databaseService: DatabaseService) { }
+  constructor(private readonly databaseService: DatabaseService) {}
 
   async create(createModuleDto: CreateModuleDto) {
     const { quizConfigs, ...moduleData } = createModuleDto;
@@ -26,7 +26,10 @@ export class ModuleService {
             }
           : {}),
       },
-      include: { quizConfigs: true, lessons: { include: { grammarRules: true } } },
+      include: {
+        quizConfigs: true,
+        lessons: { include: { grammarRules: true } },
+      },
     });
   }
 
@@ -38,8 +41,8 @@ export class ModuleService {
   }) {
     const { jlptLevel, categoryType, skip, take } = params;
     const where = {
-      jlptLevel: jlptLevel as JlptLevel || undefined,
-      categoryType: categoryType as CategoryType || undefined,
+      jlptLevel: (jlptLevel as JlptLevel) || undefined,
+      categoryType: (categoryType as CategoryType) || undefined,
     };
 
     const [modules, count] = await Promise.all([
@@ -47,10 +50,13 @@ export class ModuleService {
         where,
         skip,
         take,
-        orderBy: { createdAt: 'desc' },
-        include: { quizConfigs: true, lessons: { include: { grammarRules: true } } },
+        orderBy: { createdAt: "desc" },
+        include: {
+          quizConfigs: true,
+          lessons: { include: { grammarRules: true } },
+        },
       }),
-      this.databaseService.module.count({ where })
+      this.databaseService.module.count({ where }),
     ]);
 
     return {
@@ -62,7 +68,10 @@ export class ModuleService {
   async findOne(id: string) {
     const module = await this.databaseService.module.findUnique({
       where: { id },
-      include: { quizConfigs: true, lessons: { include: { grammarRules: true } } },
+      include: {
+        quizConfigs: true,
+        lessons: { include: { grammarRules: true } },
+      },
     });
     if (!module) {
       throw new NotFoundException(`Module with id '${id}' not found`);
@@ -71,7 +80,9 @@ export class ModuleService {
   }
 
   async update(id: string, updateModuleDto: UpdateModuleDto) {
-    const existing = await this.databaseService.module.findUnique({ where: { id } });
+    const existing = await this.databaseService.module.findUnique({
+      where: { id },
+    });
     if (!existing) {
       throw new NotFoundException(`Module with id '${id}' not found`);
     }
@@ -90,12 +101,17 @@ export class ModuleService {
             }
           : {}),
       },
-      include: { quizConfigs: true, lessons: { include: { grammarRules: true } } },
+      include: {
+        quizConfigs: true,
+        lessons: { include: { grammarRules: true } },
+      },
     });
   }
 
   async remove(id: string) {
-    const existing = await this.databaseService.module.findUnique({ where: { id } });
+    const existing = await this.databaseService.module.findUnique({
+      where: { id },
+    });
     if (!existing) {
       throw new NotFoundException(`Module with id '${id}' not found`);
     }
@@ -106,11 +122,14 @@ export class ModuleService {
   async getQuizConfigsByModule(moduleId: string) {
     return this.databaseService.quizConfig.findMany({
       where: { moduleId },
-      orderBy: { numQuestions: 'asc' },
+      orderBy: { numQuestions: "asc" },
     });
   }
 
-  async createQuizConfig(moduleId: string, config: { name: string; numQuestions: number; durationSec: number }) {
+  async createQuizConfig(
+    moduleId: string,
+    config: { name: string; numQuestions: number; durationSec: number },
+  ) {
     return this.databaseService.quizConfig.create({
       data: {
         ...config,
@@ -119,7 +138,10 @@ export class ModuleService {
     });
   }
 
-  async updateQuizConfig(configId: string, dto: { name: string; numQuestions: number; durationSec: number }) {
+  async updateQuizConfig(
+    configId: string,
+    dto: { name: string; numQuestions: number; durationSec: number },
+  ) {
     const existing = await this.databaseService.quizConfig.findFirst({
       where: { id: configId },
     });
@@ -152,12 +174,17 @@ export class ModuleService {
   async getQuizByModule(id: string, quizConfigId: string) {
     const [module, quizConfig] = await Promise.all([
       this.databaseService.module.findUnique({ where: { id } }),
-      this.databaseService.quizConfig.findUnique({ where: { id: quizConfigId } }),
+      this.databaseService.quizConfig.findUnique({
+        where: { id: quizConfigId },
+      }),
     ]);
 
-    if (!module) throw new NotFoundException(`Module with id '${id}' not found`);
+    if (!module)
+      throw new NotFoundException(`Module with id '${id}' not found`);
     if (!quizConfig || quizConfig.moduleId !== id) {
-      throw new NotFoundException(`Quiz config with id '${quizConfigId}' not found for this module`);
+      throw new NotFoundException(
+        `Quiz config with id '${quizConfigId}' not found for this module`,
+      );
     }
 
     const moduleQuestions = await this.databaseService.question.findMany({
@@ -185,7 +212,7 @@ export class ModuleService {
       },
       include: {
         questions: {
-          orderBy: { order: 'asc' },
+          orderBy: { order: "asc" },
           include: { question: true },
         },
         quizConfig: true,
@@ -228,20 +255,22 @@ export class ModuleService {
   async fetchAllModuleRules() {
     try {
       const rules = await this.databaseService.rule.findMany({
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: "asc" },
       });
 
       if (!rules || rules.length === 0) {
-        throw new NotFoundException('No rules found');
+        throw new NotFoundException("No rules found");
       }
 
-      return rules.map(rule => ({
+      return rules.map((rule) => ({
         id: rule.id,
         name: rule.name,
         rules: rule.rules,
       }));
     } catch (error) {
-      throw new Error(`Failed to fetch rules: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to fetch rules: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     }
   }
 
@@ -251,7 +280,7 @@ export class ModuleService {
       include: {
         lessons: {
           include: { grammarRules: { include: { examples: true } } },
-          orderBy: { lessonNumber: 'asc' },
+          orderBy: { lessonNumber: "asc" },
         },
       },
     });
@@ -264,7 +293,9 @@ export class ModuleService {
   }
 
   async createLesson(moduleId: string, dto: CreateLessonDto) {
-    const module = await this.databaseService.module.findUnique({ where: { id: moduleId } });
+    const module = await this.databaseService.module.findUnique({
+      where: { id: moduleId },
+    });
 
     if (!module) {
       throw new NotFoundException(`Module with id '${moduleId}' not found`);
@@ -293,7 +324,9 @@ export class ModuleService {
   }
 
   async updateLesson(lessonId: string, dto: UpdateLessonDto) {
-    const existing = await this.databaseService.lesson.findUnique({ where: { id: lessonId } });
+    const existing = await this.databaseService.lesson.findUnique({
+      where: { id: lessonId },
+    });
 
     if (!existing) {
       throw new NotFoundException(`Lesson with id '${lessonId}' not found`);
@@ -307,7 +340,9 @@ export class ModuleService {
   }
 
   async deleteLesson(lessonId: string) {
-    const existing = await this.databaseService.lesson.findUnique({ where: { id: lessonId } });
+    const existing = await this.databaseService.lesson.findUnique({
+      where: { id: lessonId },
+    });
 
     if (!existing) {
       throw new NotFoundException(`Lesson with id '${lessonId}' not found`);
@@ -322,7 +357,7 @@ export class ModuleService {
       include: {
         grammarRules: {
           include: { examples: true },
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: "asc" },
         },
       },
     });
@@ -335,7 +370,9 @@ export class ModuleService {
   }
 
   async createRule(lessonId: string, dto: CreateGrammarRuleDto) {
-    const lesson = await this.databaseService.lesson.findUnique({ where: { id: lessonId } });
+    const lesson = await this.databaseService.lesson.findUnique({
+      where: { id: lessonId },
+    });
 
     if (!lesson) {
       throw new NotFoundException(`Lesson with id '${lessonId}' not found`);
@@ -349,10 +386,10 @@ export class ModuleService {
         lessonId,
         ...(examples && examples.length > 0
           ? {
-            examples: {
-              create: examples,
-            },
-          }
+              examples: {
+                create: examples,
+              },
+            }
           : {}),
       },
       include: { examples: true },
@@ -373,7 +410,9 @@ export class ModuleService {
   }
 
   async updateRule(ruleId: string, dto: UpdateGrammarRuleDto) {
-    const existing = await this.databaseService.grammarRule.findUnique({ where: { id: ruleId } });
+    const existing = await this.databaseService.grammarRule.findUnique({
+      where: { id: ruleId },
+    });
 
     if (!existing) {
       throw new NotFoundException(`Grammar rule with id '${ruleId}' not found`);
@@ -387,10 +426,10 @@ export class ModuleService {
         ...ruleData,
         ...(examples && examples.length > 0
           ? {
-            examples: {
-              create: examples,
-            },
-          }
+              examples: {
+                create: examples,
+              },
+            }
           : {}),
       },
       include: { examples: true },
@@ -398,7 +437,9 @@ export class ModuleService {
   }
 
   async deleteRule(ruleId: string) {
-    const existing = await this.databaseService.grammarRule.findUnique({ where: { id: ruleId } });
+    const existing = await this.databaseService.grammarRule.findUnique({
+      where: { id: ruleId },
+    });
 
     if (!existing) {
       throw new NotFoundException(`Grammar rule with id '${ruleId}' not found`);

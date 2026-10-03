@@ -1,27 +1,27 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { LeaderboardEntryDto } from './leaderboard-entry.dto';
+import { ApiProperty } from "@nestjs/swagger";
+import { LeaderboardEntryDto } from "./leaderboard-entry.dto";
 
 export class UserRankDto extends LeaderboardEntryDto {
-  @ApiProperty({ description: 'User rank in this leaderboard', example: 15 })
+  @ApiProperty({ description: "User rank in this leaderboard", example: 15 })
   rank!: number;
 }
 
 export class LeaderboardCategoryDto {
   @ApiProperty({
-    description: 'Top 10 entries in this leaderboard',
+    description: "Top 10 entries in this leaderboard",
     type: [LeaderboardEntryDto],
   })
   top10!: LeaderboardEntryDto[];
 
   @ApiProperty({
-    description: 'Current user rank and details',
+    description: "Current user rank and details",
     type: UserRankDto,
     nullable: true,
   })
   currentUserRank?: UserRankDto | null;
 
   @ApiProperty({
-    description: 'Total number of candidates in this leaderboard',
+    description: "Total number of candidates in this leaderboard",
     example: 42,
   })
   totalUsers!: number;

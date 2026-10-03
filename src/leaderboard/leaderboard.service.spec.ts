@@ -1,10 +1,10 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { LeaderboardService } from './leaderboard.service';
-import { DatabaseService } from 'src/database/database.service';
-import { CacheService } from 'src/common/services/cache.service';
-import { LeaderboardGateway } from './leaderboard.gateway';
+import { Test, TestingModule } from "@nestjs/testing";
+import { LeaderboardService } from "./leaderboard.service";
+import { DatabaseService } from "src/database/database.service";
+import { CacheService } from "src/common/services/cache.service";
+import { LeaderboardGateway } from "./leaderboard.gateway";
 
-describe('LeaderboardService', () => {
+describe("LeaderboardService", () => {
   let service: LeaderboardService;
 
   beforeEach(async () => {
@@ -29,7 +29,7 @@ describe('LeaderboardService', () => {
     service = module.get<LeaderboardService>(LeaderboardService);
   });
 
-  it('should be defined', () => {
+  it("should be defined", () => {
     expect(service).toBeDefined();
   });
 });

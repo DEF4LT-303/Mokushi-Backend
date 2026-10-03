@@ -1,13 +1,13 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma, Role } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
-import { SafeUser, safeUserSelect } from 'prisma/safe-user.select';
-import { DatabaseService } from 'src/database/database.service';
-import { CreateUserDto } from './dto/create-user.dto';
+import { Injectable } from "@nestjs/common";
+import { Prisma, Role } from "@prisma/client";
+import * as bcrypt from "bcrypt";
+import { SafeUser, safeUserSelect } from "prisma/safe-user.select";
+import { DatabaseService } from "src/database/database.service";
+import { CreateUserDto } from "./dto/create-user.dto";
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly databaseService: DatabaseService) { }
+  constructor(private readonly databaseService: DatabaseService) {}
 
   async create(createUserDto: CreateUserDto) {
     const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
@@ -26,7 +26,7 @@ export class UsersService {
         role: role ? { equals: role } : undefined,
       },
       select: safeUserSelect,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -82,7 +82,7 @@ export class UsersService {
           firstName,
           lastName,
           picture,
-          provider: 'google'
+          provider: "google",
         },
       });
     } else {

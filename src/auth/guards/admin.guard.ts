@@ -1,7 +1,12 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
-import { SafeUser } from 'prisma/safe-user.select';
-import { isAdmin } from 'src/common/utils/role.helpers';
-import { JwtGuard } from './jwt.guard';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+} from "@nestjs/common";
+import { SafeUser } from "prisma/safe-user.select";
+import { isAdmin } from "src/common/utils/role.helpers";
+import { JwtGuard } from "./jwt.guard";
 
 /**
  * Requires JWT token and admin role. Convenience guard combining JwtGuard + admin check.
@@ -20,12 +25,12 @@ export class AdminGuard extends JwtGuard implements CanActivate {
     const user = request.user as SafeUser;
 
     if (!user || !user.id) {
-      throw new ForbiddenException('User not found in request');
+      throw new ForbiddenException("User not found in request");
     }
 
     // Check if user has admin role using the helper function
     if (!isAdmin(user.role)) {
-      throw new ForbiddenException('Admin access required');
+      throw new ForbiddenException("Admin access required");
     }
 
     return true;
