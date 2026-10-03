@@ -31,6 +31,7 @@ describe("UserAttemptsService", () => {
       quizQuestion: {
         count: jest.fn(),
         findMany: jest.fn(),
+        groupBy: jest.fn(),
       },
       $transaction: jest.fn().mockImplementation((val) => {
         if (typeof val === "function") {
@@ -153,6 +154,132 @@ describe("UserAttemptsService", () => {
         success: true,
         message: "Quiz attempt cancelled successfully",
       });
+    });
+  });
+
+  describe("getQuizHistory", () => {
+    it("should query for COMPLETED and CANCELLED attempts by default and map cancelled quizzes correctly", async () => {
+      const mockAttempts = [
+        {
+          id: "att-1",
+          quizId: "quiz-1",
+          status: "COMPLETED",
+          score: 8,
+          startedAt: new Date("2026-01-01T10:00:00Z"),
+          submittedAt: new Date("2026-01-01T10:05:00Z"),
+          quiz: {
+            module: { categoryType: "GRAMMAR" },
+          },
+        },
+        {
+          id: "att-2",
+          quizId: "quiz-1",
+          status: "CANCELLED",
+          score: 0,
+          startedAt: new Date("2026-01-01T11:00:00Z"),
+          submittedAt: new Date("2026-01-01T11:01:00Z"),
+          quiz: {
+            module: { categoryType: "GRAMMAR" },
+          },
+        },
+      ];
+
+      databaseService.userAttempt.count.mockResolvedValue(2);
+      databaseService.userAttempt.findMany.mockResolvedValue(mockAttempts);
+      databaseService.quizQuestion.groupBy.mockResolvedValue([
+        { quizId: "quiz-1", _count: { _all: 10 } },
+      ]);
+
+      const result = await service.getQuizHistory("user-1");
+
+      expect(databaseService.userAttempt.count).toHaveBeenCalledWith({
+        where: {
+          userId: "user-1",
+          status: { in: ["COMPLETED", "CANCELLED"] },
+        },
+      });
+
+      expect(result.total).toBe(2);
+      expect(result.data).toHaveLength(2);
+      expect(result.data[0]).toMatchObject({
+        id: "att-1",
+        status: "COMPLETED",
+        performance: "EXCELLENT",
+      });
+      expect(result.data[1]).toMatchObject({
+        id: "att-2",
+        status: "CANCELLED",
+        performance: "CANCELLED",
+      });
+    });
+
+    it("should allow filtering by a specific status", async () => {
+      databaseService.userAttempt.count.mockResolvedValue(0);
+      databaseService.userAttempt.findMany.mockResolvedValue([]);
+      databaseService.quizQuestion.groupBy.mockResolvedValue([]);
+
+      await service.getQuizHistory(
+        "user-1",
+        10,
+        0,
+        undefined,
+        "CANCELLED" as any,
+      );
+
+      expect(databaseService.userAttempt.count).toHaveBeenCalledWith({
+        where: {
+          userId: "user-1",
+          status: "CANCELLED",
+        },
+      });
+    });
+  });
+
+  describe("getQuizHistoryDetail", () => {
+    it("should throw NotFoundException if attempt is not found", async () => {
+      databaseService.userAttempt.findUnique.mockResolvedValue(null);
+      await expect(service.getQuizHistoryDetail("missing-att")).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it("should throw NotFoundException if attempt is still ONGOING", async () => {
+      databaseService.userAttempt.findUnique.mockResolvedValue({
+        id: "att-ongoing",
+        status: "ONGOING",
+      });
+      await expect(service.getQuizHistoryDetail("att-ongoing")).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it("should return detailed history for a CANCELLED attempt with status", async () => {
+      const mockCancelledAttempt = {
+        id: "att-cancelled",
+        quizId: "quiz-1",
+        status: "CANCELLED",
+        score: 0,
+        startedAt: new Date("2026-01-01T10:00:00Z"),
+        submittedAt: new Date("2026-01-01T10:01:00Z"),
+        quiz: {
+          module: { id: "mod-1" },
+          quizConfig: null,
+        },
+        userAnswers: [],
+      };
+
+      databaseService.userAttempt.findUnique.mockResolvedValue(
+        mockCancelledAttempt,
+      );
+      databaseService.quizQuestion.count.mockResolvedValue(10);
+
+      const result = await service.getQuizHistoryDetail("att-cancelled");
+
+      expect(result.success).toBe(true);
+      expect(result.submission.status).toBe("CANCELLED");
+      expect(result.submission.score).toBe(0);
+      expect(result.submission.totalQuestions).toBe(10);
+      expect(result.submission.results).toEqual([]);
     });
   });
 });

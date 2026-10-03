@@ -101,7 +101,7 @@ export class LeaderboardService {
 
   private buildWhereCondition(jlptLevel?: string): any {
     const where: any = {
-      status: 'COMPLETED',
+      status: "COMPLETED",
       normalizedScore: { not: null },
     };
 
@@ -126,7 +126,7 @@ export class LeaderboardService {
   // ============================
   async getModuleLeaderboard(moduleId: string, userId?: string) {
     const where = {
-      status: 'COMPLETED',
+      status: "COMPLETED",
       normalizedScore: { not: null },
       quiz: { moduleId },
     };

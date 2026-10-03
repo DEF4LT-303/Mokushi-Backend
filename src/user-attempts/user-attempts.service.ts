@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
+import { UserAttemptStatus } from "@prisma/client";
 import { DatabaseService } from "src/database/database.service";
 import { LeaderboardService } from "src/leaderboard/leaderboard.service";
 import { CreateUserAnswerDto } from "./dto/create-user-answer.dto";
@@ -40,7 +41,7 @@ export class UserAttemptsService {
 
   async createAttempt(dto: CreateUserAttemptDto) {
     return this.databaseService.userAttempt.create({
-      data: { ...dto, score: 0, status: 'ONGOING' },
+      data: { ...dto, score: 0, status: "ONGOING" },
     });
   }
 
@@ -61,17 +62,17 @@ export class UserAttemptsService {
       );
     }
 
-    if (attempt.status === 'COMPLETED') {
+    if (attempt.status === "COMPLETED") {
       throw new BadRequestException(`Cannot cancel a completed quiz attempt`);
     }
 
-    if (attempt.status === 'CANCELLED') {
+    if (attempt.status === "CANCELLED") {
       throw new BadRequestException(`Quiz attempt is already cancelled`);
     }
 
     await this.databaseService.userAttempt.update({
       where: { id: userAttemptId },
-      data: { status: 'CANCELLED', submittedAt: new Date() },
+      data: { status: "CANCELLED", submittedAt: new Date() },
     });
 
     return { success: true, message: "Quiz attempt cancelled successfully" };
@@ -115,7 +116,7 @@ export class UserAttemptsService {
     const score = answers.filter((ans) => ans.correct).length;
     const updatedAttempt = await this.databaseService.userAttempt.update({
       where: { id: userAttemptId },
-      data: { score, status: 'COMPLETED' },
+      data: { score, status: "COMPLETED" },
       include: {
         quiz: true,
       },
@@ -153,7 +154,7 @@ export class UserAttemptsService {
       );
     }
 
-    if (attempt.status === 'COMPLETED') {
+    if (attempt.status === "COMPLETED") {
       const existingAnswers = await this.databaseService.userAnswer.findMany({
         where: { userAttemptId },
       });
@@ -174,9 +175,9 @@ export class UserAttemptsService {
       };
     }
 
-    if (attempt.status === 'CANCELLED') {
+    if (attempt.status === "CANCELLED") {
       throw new BadRequestException(
-        'Cannot submit answers for a cancelled quiz attempt',
+        "Cannot submit answers for a cancelled quiz attempt",
       );
     }
 
@@ -197,7 +198,7 @@ export class UserAttemptsService {
         const expiredScore = existingAnswers.filter((a) => a.correct).length;
         const updatedAttempt = await this.databaseService.userAttempt.update({
           where: { id: userAttemptId },
-          data: { status: 'COMPLETED', score: expiredScore, submittedAt: now },
+          data: { status: "COMPLETED", score: expiredScore, submittedAt: now },
           include: {
             quiz: true,
           },
@@ -257,7 +258,7 @@ export class UserAttemptsService {
 
         return tx.userAttempt.update({
           where: { id: userAttemptId },
-          data: { score, normalizedScore, status: 'COMPLETED', submittedAt },
+          data: { score, normalizedScore, status: "COMPLETED", submittedAt },
           include: { quiz: true },
         });
       },
@@ -321,10 +322,11 @@ export class UserAttemptsService {
     limit?: number,
     offset?: number,
     categoryType?: string,
+    status?: UserAttemptStatus,
   ) {
     const whereClause: any = {
       userId,
-      status: 'COMPLETED',
+      status: status ? status : { in: ["COMPLETED", "CANCELLED"] },
     };
 
     if (categoryType) {
@@ -384,6 +386,7 @@ export class UserAttemptsService {
       return {
         id: attempt.id,
         category: attempt.quiz.module?.categoryType ?? "UNKNOWN",
+        status: attempt.status,
         date:
           attempt.submittedAt?.toISOString() ?? attempt.startedAt.toISOString(),
         score: attempt.score,
@@ -392,7 +395,10 @@ export class UserAttemptsService {
           attempt.startedAt,
           attempt.submittedAt,
         ),
-        performance: this.getPerformanceLabel(attempt.score, totalQuestions),
+        performance:
+          attempt.status === "CANCELLED"
+            ? "CANCELLED"
+            : this.getPerformanceLabel(attempt.score, totalQuestions),
       };
     });
 
@@ -430,9 +436,9 @@ export class UserAttemptsService {
       );
     }
 
-    if (attempt.status !== 'COMPLETED') {
+    if (attempt.status === "ONGOING") {
       throw new NotFoundException(
-        "This quiz attempt has not been completed yet",
+        "This quiz attempt has not been completed or cancelled yet",
       );
     }
 
@@ -459,6 +465,7 @@ export class UserAttemptsService {
     return {
       success: true,
       submission: {
+        status: attempt.status,
         quizDate: attempt.submittedAt || attempt.startedAt,
         score: attempt.score,
         totalQuestions,
