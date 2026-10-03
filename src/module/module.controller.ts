@@ -43,7 +43,7 @@ export class ModuleController {
   constructor(
     private readonly moduleService: ModuleService,
     private readonly userAttemptsService: UserAttemptsService,
-  ) { }
+  ) {}
 
   @UseGuards(JwtGuard, RolesGuard)
   @Roles(Role.ADMIN)
@@ -207,8 +207,7 @@ export class ModuleController {
   @Post("/quiz/submit")
   @ApiBearerAuth()
   @ApiOperation({
-    summary:
-      "Submit quiz answers for a user attempt",
+    summary: "Submit quiz answers for a user attempt",
   })
   @ApiBody({ type: SubmitQuizDto })
   @ApiUnauthorizedResponse({ description: "Unauthorized" })
@@ -234,8 +233,7 @@ export class ModuleController {
   @Post("/quiz/cancel")
   @ApiBearerAuth()
   @ApiOperation({
-    summary:
-      "Cancel an ongoing quiz attempt",
+    summary: "Cancel an ongoing quiz attempt",
   })
   @ApiBody({ type: CancelQuizDto })
   @ApiUnauthorizedResponse({ description: "Unauthorized" })

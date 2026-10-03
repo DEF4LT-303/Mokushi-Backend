@@ -1,7 +1,15 @@
 import { ApiProperty } from "@nestjs/swagger";
 import { QuizResultItemDto } from "./quiz-question-detail.dto";
+import { UserAttemptStatus } from "@prisma/client";
 
 export class QuizHistorySubmissionDto {
+  @ApiProperty({
+    description: "Status of the quiz attempt",
+    enum: ["COMPLETED", "CANCELLED", "ONGOING"],
+    required: false,
+  })
+  status?: UserAttemptStatus | string;
+
   @ApiProperty({ description: "Score achieved" })
   score!: number;
 

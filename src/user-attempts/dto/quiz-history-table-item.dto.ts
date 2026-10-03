@@ -1,4 +1,5 @@
 import { ApiProperty } from "@nestjs/swagger";
+import { UserAttemptStatus } from "@prisma/client";
 
 export class QuizHistoryTableItemDto {
   @ApiProperty({ description: "User attempt ID" })
@@ -8,6 +9,12 @@ export class QuizHistoryTableItemDto {
     description: "Quiz category (GRAMMAR, VOCABULARY, LISTENING)",
   })
   category!: string;
+
+  @ApiProperty({
+    description: "Status of the quiz attempt",
+    enum: ["COMPLETED", "CANCELLED", "ONGOING"],
+  })
+  status!: UserAttemptStatus | string;
 
   @ApiProperty({ description: "ISO formatted date string" })
   date!: string;
@@ -23,7 +30,15 @@ export class QuizHistoryTableItemDto {
 
   @ApiProperty({
     description: "Performance label based on score",
-    enum: ["EXCELLENT", "GOOD", "AVERAGE", "NEEDS WORK", "N/A"],
+    enum: [
+      "EXCELLENT",
+      "GOOD",
+      "AVERAGE",
+      "POOR",
+      "NEEDS WORK",
+      "CANCELLED",
+      "N/A",
+    ],
   })
   performance!: string;
 }

@@ -88,7 +88,7 @@ export class UserAttemptsController {
   @UseGuards(JwtGuard)
   @ApiOperation({
     summary:
-      "Get quiz history for current user with pagination and category filtering",
+      "Get quiz history for current user with pagination, category, and status filtering",
   })
   @ApiQuery({
     name: "limit",
@@ -109,6 +109,13 @@ export class UserAttemptsController {
     required: false,
     enum: ["GRAMMAR", "VOCABULARY", "LISTENING"],
   })
+  @ApiQuery({
+    name: "status",
+    required: false,
+    enum: ["COMPLETED", "CANCELLED"],
+    description:
+      "Filter by quiz attempt status (defaults to both COMPLETED and CANCELLED)",
+  })
   @ApiBearerAuth()
   @ApiUnauthorizedResponse({ description: "Unauthorized" })
   @ApiForbiddenResponse({ description: "Forbidden" })
@@ -121,17 +128,20 @@ export class UserAttemptsController {
     @Query("limit") limit?: string,
     @Query("skip") skip?: string,
     @Query("categoryType") categoryType?: string,
+    @Query("status") status?: string,
   ) {
     const userId = user?.id || user?.sub;
     const limitNum = limit
       ? Math.min(Math.max(parseInt(limit, 10), 1), 100)
       : undefined;
     const offsetNum = skip ? Math.max(parseInt(skip, 10), 0) : undefined;
+    const statusEnum = status as any;
     return this.userAttemptsService.getQuizHistory(
       userId,
       limitNum,
       offsetNum,
       categoryType,
+      statusEnum,
     );
   }
 
