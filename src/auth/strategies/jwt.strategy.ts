@@ -3,7 +3,7 @@ import { PassportStrategy } from "@nestjs/passport";
 import { ExtractJwt, Strategy } from "passport-jwt";
 import { Request } from "express";
 import { DatabaseService } from "src/database/database.service";
-import { SafeUser } from "prisma/safe-user.select";
+import { SafeUser, safeUserSelect } from "prisma/safe-user.select";
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -26,21 +26,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // Fetch full user data from database
     const user = await this.databaseService.user.findUnique({
       where: { id: payload.sub },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        firstName: true,
-        lastName: true,
-        picture: true,
-        role: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+      select: safeUserSelect,
     });
 
     if (user) {
-      return user as SafeUser;
+      return user;
     }
 
     // Fallback to just userId if user not found

@@ -56,7 +56,7 @@ export class RapidFireController {
     @CurrentUser() user: any,
     @Param("lessonId") lessonId: string,
   ) {
-    return this.rapidFireService.getLessonDetail(user.id, lessonId);
+    return this.rapidFireService.getLessonDetail(user.id, lessonId, user);
   }
 
   @UseGuards(JwtGuard)
