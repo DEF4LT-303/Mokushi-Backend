@@ -8,13 +8,41 @@ export interface CookieOptions {
   path: string;
 }
 
-export const getCookieOptions = (isProduction: boolean): CookieOptions => ({
-  httpOnly: true,
-  secure: isProduction,
-  sameSite: "none",
-  maxAge: 0,
-  path: "/",
-});
+export const getCookieOptions = (isProduction?: boolean): CookieOptions => {
+  const isProd =
+    isProduction !== undefined
+      ? isProduction
+      : process.env.NODE_ENV === "production";
+
+  // Check if running in a purely local HTTP environment without SSL
+  const isLocalHttp =
+    !isProd &&
+    Boolean(
+      process.env.FRONTEND_URL?.startsWith("http://localhost") ||
+        process.env.BACKEND_URL?.startsWith("http://localhost"),
+    );
+
+  // In modern browsers, SameSite=None strictly requires Secure=true (RFC 6265bis).
+  // On local HTTP, use sameSite: 'lax' and secure: false.
+  // On hosted environments (VPS, staging, dev.mokushiken.com, production), use sameSite: 'none' and secure: true.
+  if (isLocalHttp) {
+    return {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+      maxAge: 0,
+      path: "/",
+    };
+  }
+
+  return {
+    httpOnly: true,
+    secure: true,
+    sameSite: "none",
+    maxAge: 0,
+    path: "/",
+  };
+};
 
 export const setAuthCookies = (
   res: Response,
