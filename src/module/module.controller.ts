@@ -181,7 +181,11 @@ export class ModuleController {
     @CurrentUser() user: any,
     @Query("quizConfigId") quizConfigId: string,
   ) {
-    const quiz = await this.moduleService.getQuizByModule(id, quizConfigId);
+    const quiz = await this.moduleService.getQuizByModule(
+      id,
+      quizConfigId,
+      user,
+    );
     // Automatically create a UserAttempt for this quiz for the current user
     const attempt = await this.userAttemptsService.createAttempt({
       userId: user.id,

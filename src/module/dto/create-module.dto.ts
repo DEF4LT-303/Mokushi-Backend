@@ -68,6 +68,13 @@ export class CreateModuleDto {
   categoryType!: CategoryType;
 
   @ApiPropertyOptional({
+    description: "Whether this module is accessible for free",
+    default: false,
+  })
+  @IsOptional()
+  isFree?: boolean;
+
+  @ApiPropertyOptional({
     description: "Optional Rule ID associated with this module",
   })
   @IsOptional()
