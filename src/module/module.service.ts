@@ -40,9 +40,19 @@ export class ModuleService {
     take?: number;
   }) {
     const { jlptLevel, categoryType, skip, take } = params;
+    const normalizedJlpt = jlptLevel?.toUpperCase() as JlptLevel;
+    const normalizedCategory = categoryType?.toUpperCase() as CategoryType;
+
     const where = {
-      jlptLevel: (jlptLevel as JlptLevel) || undefined,
-      categoryType: (categoryType as CategoryType) || undefined,
+      jlptLevel:
+        normalizedJlpt && Object.values(JlptLevel).includes(normalizedJlpt)
+          ? normalizedJlpt
+          : undefined,
+      categoryType:
+        normalizedCategory &&
+        Object.values(CategoryType).includes(normalizedCategory)
+          ? normalizedCategory
+          : undefined,
     };
 
     const [modules, count] = await Promise.all([

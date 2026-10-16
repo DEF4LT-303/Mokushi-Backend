@@ -130,7 +130,7 @@ export class UserAttemptsController {
     @Query("categoryType") categoryType?: string,
     @Query("status") status?: string,
   ) {
-    const userId = user?.id || user?.sub;
+    const userId = user?.id || user?.userId || user?.sub;
     const limitNum = limit
       ? Math.min(Math.max(parseInt(limit, 10), 1), 100)
       : undefined;

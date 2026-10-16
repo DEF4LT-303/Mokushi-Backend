@@ -37,7 +37,12 @@ export const setAuthCookies = (
   });
 };
 
-export const clearAuthCookies = (res: Response) => {
-  res.clearCookie("access_token", { path: "/" });
-  res.clearCookie("refresh_token", { path: "/" });
+export const clearAuthCookies = (res: Response, isProduction?: boolean) => {
+  const prod =
+    isProduction !== undefined
+      ? isProduction
+      : process.env.NODE_ENV === "production";
+  const baseOptions = getCookieOptions(prod);
+  res.clearCookie("access_token", baseOptions);
+  res.clearCookie("refresh_token", baseOptions);
 };

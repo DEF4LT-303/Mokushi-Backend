@@ -106,7 +106,8 @@ export class LeaderboardService {
     };
 
     if (jlptLevel) {
-      where.quiz = { jlptLevel };
+      const normalized = jlptLevel.toUpperCase();
+      where.quiz = { jlptLevel: normalized };
     }
 
     return where;

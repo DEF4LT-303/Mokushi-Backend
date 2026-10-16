@@ -38,7 +38,7 @@ export class LeaderboardController {
     @CurrentUser() user?: any,
     @Query("jlptLevel") jlptLevel?: string,
   ) {
-    const userId = user?.id || user?.sub;
+    const userId = user?.id || user?.userId || user?.sub;
     return this.leaderboardService.getCategorizedLeaderboard(userId, jlptLevel);
   }
 
@@ -59,7 +59,7 @@ export class LeaderboardController {
     @Param("moduleId") moduleId: string,
     @CurrentUser() user?: any,
   ) {
-    const userId = user?.id || user?.sub;
+    const userId = user?.id || user?.userId || user?.sub;
     return this.leaderboardService.getModuleLeaderboard(moduleId, userId);
   }
 }
