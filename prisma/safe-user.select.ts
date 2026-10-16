@@ -10,6 +10,12 @@ export const safeUserSelect = {
   role: true,
   createdAt: true,
   updatedAt: true,
+  purchases: {
+    select: {
+      planType: true,
+      purchasedAt: true,
+    },
+  },
 } satisfies Prisma.UserSelect;
 
 export type SafeUser = Prisma.UserGetPayload<{

@@ -71,6 +71,7 @@ export class AuthController {
     return {
       message: "Login successful",
       user: result.user,
+      accessToken: result.accessToken,
     };
   }
 
@@ -104,6 +105,7 @@ export class AuthController {
       return {
         message: "Registration successful",
         user: result.user,
+        accessToken: result.accessToken,
       };
     } catch (error) {
       if (error instanceof Prisma.PrismaClientKnownRequestError) {

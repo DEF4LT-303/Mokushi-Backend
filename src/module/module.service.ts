@@ -1,5 +1,9 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { CategoryType, JlptLevel } from "@prisma/client";
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { CategoryType, JlptLevel, PlanType, Role } from "@prisma/client";
 import { DatabaseService } from "src/database/database.service";
 import { CreateGrammarRuleDto } from "./dto/create-grammar-rule.dto";
 import { CreateLessonDto } from "./dto/create-lesson.dto";
@@ -171,7 +175,7 @@ export class ModuleService {
   }
   // * Quiz config management
 
-  async getQuizByModule(id: string, quizConfigId: string) {
+  async getQuizByModule(id: string, quizConfigId: string, user?: any) {
     const [module, quizConfig] = await Promise.all([
       this.databaseService.module.findUnique({ where: { id } }),
       this.databaseService.quizConfig.findUnique({
@@ -185,6 +189,39 @@ export class ModuleService {
       throw new NotFoundException(
         `Quiz config with id '${quizConfigId}' not found for this module`,
       );
+    }
+
+    // Access control: if module is not free and user is not admin, verify bundle purchase
+    if (!module.isFree && user?.role !== Role.ADMIN) {
+      const userPurchases =
+        user?.purchases ||
+        (user?.id
+          ? await this.databaseService.userPurchase.findMany({
+              where: { userId: user.id },
+              select: { planType: true },
+            })
+          : []);
+
+      const hasFullAccess = userPurchases.some(
+        (p: any) => p.planType === PlanType.FULL_ACCESS_BUNDLE,
+      );
+      const hasN5 = userPurchases.some(
+        (p: any) => p.planType === PlanType.N5_BUNDLE,
+      );
+      const hasN4 = userPurchases.some(
+        (p: any) => p.planType === PlanType.N4_BUNDLE,
+      );
+
+      const hasAccess =
+        hasFullAccess ||
+        (module.jlptLevel === JlptLevel.N5 && hasN5) ||
+        (module.jlptLevel === JlptLevel.N4 && hasN4);
+
+      if (!hasAccess) {
+        throw new ForbiddenException(
+          `Module '${module.name}' is locked. Please unlock the ${module.jlptLevel} Bundle or Full Access Bundle to take quizzes.`,
+        );
+      }
     }
 
     const moduleQuestions = await this.databaseService.question.findMany({
