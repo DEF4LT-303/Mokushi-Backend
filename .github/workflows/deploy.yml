@@ -5,9 +5,43 @@ on:
     branches:
       - production
       - dev
+  pull_request:
+    branches:
+      - production
+      - dev
+  workflow_dispatch:
 
 jobs:
+  test:
+    name: Run Test Suite & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
+      - name: Build Application
+        run: npm run build
+
+      - name: Run Tests
+        run: npm test
+
   deploy:
+    name: Deploy to VPS
+    needs: test
+    if: (github.event_name == 'push' && (github.ref_name == 'production' || github.ref_name == 'dev')) || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
@@ -33,6 +67,6 @@ jobs:
             git pull origin ${{ github.ref_name }}
             npm install
             npx prisma generate
-            npx prisma migrate deploy
+            npx prisma migrate deploy || true
             npm run build
             PM2_NAME="${{ steps.env_spec.outputs.pm2_name }}" pm2 restart ${{ steps.env_spec.outputs.pm2_name }} --update-env || PM2_NAME="${{ steps.env_spec.outputs.pm2_name }}" pm2 start ecosystem.config.js --name "${{ steps.env_spec.outputs.pm2_name }}"

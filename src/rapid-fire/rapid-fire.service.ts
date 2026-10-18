@@ -1,9 +1,10 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
-import { JlptLevel } from "@prisma/client";
+import { JlptLevel, PlanType, Role } from "@prisma/client";
 import { CacheService } from "../common/services/cache.service";
 import { DatabaseService } from "../database/database.service";
 import { RapidFireLessonOverviewDto } from "./dto/lesson-detail.dto";
@@ -120,6 +121,7 @@ export class RapidFireService {
   async getLessonDetail(
     userId: string,
     lessonId: string,
+    user?: any,
   ): Promise<RapidFireLessonOverviewDto> {
     const rapidFireLesson =
       await this.databaseService.rapidFireLesson.findUnique({
@@ -131,6 +133,37 @@ export class RapidFireService {
       throw new NotFoundException(
         `Rapid-fire lesson for id '${lessonId}' not found`,
       );
+    }
+
+    // Check bundle ownership and enforce free daily practice limit
+    const userPurchases =
+      user?.purchases ||
+      (await this.databaseService.userPurchase.findMany({
+        where: { userId },
+        select: { planType: true },
+      }));
+
+    const hasUnlimited =
+      user?.role === Role.ADMIN ||
+      userPurchases.some(
+        (p: any) =>
+          p.planType === PlanType.RAPID_FIRE_BUNDLE ||
+          p.planType === PlanType.FULL_ACCESS_BUNDLE,
+      );
+
+    if (!hasUnlimited) {
+      const today = new Date().toISOString().slice(0, 10);
+      const cacheKey = `rapidfire:daily_count:${userId}:${today}`;
+      const currentCount = (await this.cache.get(cacheKey)) || 0;
+      const MAX_FREE_DAILY = 3;
+
+      if (currentCount >= MAX_FREE_DAILY) {
+        throw new ForbiddenException(
+          `Daily free Rapid-Fire practice limit reached (${MAX_FREE_DAILY}/${MAX_FREE_DAILY}). Please unlock the Rapid-Fire Bundle or Full Access Bundle for unlimited practice.`,
+        );
+      }
+
+      await this.cache.set(cacheKey, currentCount + 1, 86400);
     }
 
     const overallStat = await this.getOrCreateOverallStat(

@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { NextFunction, Request, Response } from "express";
+import { clearAuthCookies, getCookieOptions } from "src/common/utils/cookie.helpers";
 import { hashToken } from "src/common/utils/jwt.helpers";
 import { DatabaseService } from "src/database/database.service";
 
@@ -29,7 +30,7 @@ export class AuthMiddleware implements NestMiddleware {
       });
 
       // Token is valid
-      req.user = { userId: payload.sub };
+      req.user = { id: payload.sub, userId: payload.sub };
       return next();
     } catch (error) {
       // Access token is expired or invalid, try to refresh
@@ -37,8 +38,7 @@ export class AuthMiddleware implements NestMiddleware {
 
       if (!refreshToken) {
         // No refresh token, clear cookies and continue
-        res.clearCookie("access_token", { path: "/" });
-        res.clearCookie("refresh_token", { path: "/" });
+        clearAuthCookies(res);
         return next();
       }
 
@@ -73,23 +73,26 @@ export class AuthMiddleware implements NestMiddleware {
           { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m" },
         );
 
-        // Set new access token cookie
+        // Set new access token cookie using matching cookie options
         const isProduction = process.env.NODE_ENV === "production";
+        const baseOptions = getCookieOptions(isProduction);
         res.cookie("access_token", newAccessToken, {
-          httpOnly: true,
-          secure: isProduction,
-          sameSite: isProduction ? "strict" : "lax",
-          maxAge: 15 * 60 * 1000, // 15 minutes
-          path: "/",
+          ...baseOptions,
+          maxAge: parseInt(process.env.COOKIE_ACCESS_MAX_AGE || "900000", 10),
         });
 
-        // Set user in request and continue - JWT strategy will handle user data
-        req.user = { userId };
+        // Mutate req.cookies and authorization header for the current in-flight request
+        if (req.cookies) {
+          req.cookies.access_token = newAccessToken;
+        }
+        req.headers.authorization = `Bearer ${newAccessToken}`;
+
+        // Set user in request with both id and userId
+        req.user = { id: userId, userId };
         return next();
       } catch (refreshError) {
         // Refresh token is invalid, clear cookies and continue
-        res.clearCookie("access_token", { path: "/" });
-        res.clearCookie("refresh_token", { path: "/" });
+        clearAuthCookies(res);
         return next();
       }
     }
