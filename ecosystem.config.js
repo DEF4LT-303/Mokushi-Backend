@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: process.env.PM2_NAME || "mokushi-backend",
+      name: process.env.PM2_NAME || "mokushi-backend-dev",
       script: "dist/src/main.js",
       instances: process.env.NODE_ENV === "production" ? 2 : 1,
       exec_mode: process.env.NODE_ENV === "production" ? "cluster" : "fork",

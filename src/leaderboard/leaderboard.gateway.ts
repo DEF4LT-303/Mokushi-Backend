@@ -1,33 +1,34 @@
-import { forwardRef, Inject, Logger } from '@nestjs/common';
+import { forwardRef, Inject, Logger } from "@nestjs/common";
 import {
   OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
-} from '@nestjs/websockets';
-import { verify } from 'jsonwebtoken';
-import { Server, Socket } from 'socket.io';
-import { LeaderboardService } from './leaderboard.service';
+} from "@nestjs/websockets";
+import { verify } from "jsonwebtoken";
+import { Server, Socket } from "socket.io";
+import { LeaderboardService } from "./leaderboard.service";
 
 @WebSocketGateway({
-  namespace: '/leaderboard',
+  namespace: "/leaderboard",
   cors: {
-    origin: process.env.FRONTEND_URL || '*',
+    origin: process.env.FRONTEND_URL || "*",
     credentials: true,
   },
 })
 export class LeaderboardGateway
-  implements OnGatewayConnection, OnGatewayDisconnect {
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server!: Server;
 
-  private logger = new Logger('LeaderboardGateway');
+  private logger = new Logger("LeaderboardGateway");
 
   constructor(
     @Inject(forwardRef(() => LeaderboardService))
     private readonly leaderboardService: LeaderboardService,
-  ) { }
+  ) {}
 
   /**
    * Extract JWT token from:
@@ -42,7 +43,7 @@ export class LeaderboardGateway
 
     // Try Authorization header
     const authHeader = client.handshake.headers.authorization;
-    if (authHeader?.startsWith('Bearer ')) {
+    if (authHeader?.startsWith("Bearer ")) {
       return authHeader.slice(7);
     }
 
@@ -62,7 +63,7 @@ export class LeaderboardGateway
     try {
       const decoded = verify(
         token,
-        process.env.JWT_ACCESS_SECRET || 'default',
+        process.env.JWT_ACCESS_SECRET || "default",
       ) as any;
       return decoded.sub || undefined;
     } catch (error) {
@@ -76,20 +77,20 @@ export class LeaderboardGateway
   async handleConnection(client: Socket) {
     try {
       const token = this.extractTokenFromRequest(client);
-      console.log('handshake auth:', client.handshake.auth);
+      console.log("handshake auth:", client.handshake.auth);
       const userId = this.extractUserIdFromToken(token);
-      console.log('resolved userId:', userId);
+      console.log("resolved userId:", userId);
 
       (client.data as any).userId = userId;
 
       this.logger.log(
-        `Client connected: ${client.id} | User: ${userId || 'anonymous'}`,
+        `Client connected: ${client.id} | User: ${userId || "anonymous"}`,
       );
 
       const leaderboard =
         await this.leaderboardService.getCategorizedLeaderboard(userId);
 
-      client.emit('leaderboard:init', leaderboard);
+      client.emit("leaderboard:init", leaderboard);
     } catch (e) {
       this.logger.error(`Connection error for client ${client.id}: ${e}`);
     }
@@ -98,11 +99,11 @@ export class LeaderboardGateway
   handleDisconnect(client: Socket) {
     const userId = (client.data as any).userId;
     this.logger.log(
-      `Client disconnected: ${client.id} | User: ${userId || 'anonymous'}`,
+      `Client disconnected: ${client.id} | User: ${userId || "anonymous"}`,
     );
   }
 
-  @SubscribeMessage('subscribe-category')
+  @SubscribeMessage("subscribe-category")
   async handleSubscribeCategory(
     client: Socket,
     payload: { category: string; jlptLevel?: string },
@@ -111,60 +112,55 @@ export class LeaderboardGateway
       const userId = (client.data as any).userId;
 
       this.logger.log(
-        `${client.id} subscribed to ${payload.category}${payload.jlptLevel ? ` (${payload.jlptLevel})` : ''}`,
+        `${client.id} subscribed to ${payload.category}${payload.jlptLevel ? ` (${payload.jlptLevel})` : ""}`,
       );
 
-      const leaderboard =
-        await this.leaderboardService.getCategoryLeaderboard(
-          payload.category,
-          userId,
-          payload.jlptLevel,
-        );
+      const leaderboard = await this.leaderboardService.getCategoryLeaderboard(
+        payload.category,
+        userId,
+        payload.jlptLevel,
+      );
 
       client.emit(`${payload.category}-leaderboard`, leaderboard);
     } catch (error) {
       this.logger.error(
         `Error in subscribe-category: ${error instanceof Error ? error.message : String(error)}`,
       );
-      client.emit('error', { message: 'Failed to fetch leaderboard' });
+      client.emit("error", { message: "Failed to fetch leaderboard" });
     }
   }
 
-  @SubscribeMessage('subscribe-module')
-  async handleSubscribeModule(
-    client: Socket,
-    payload: { moduleId: string },
-  ) {
+  @SubscribeMessage("subscribe-module")
+  async handleSubscribeModule(client: Socket, payload: { moduleId: string }) {
     try {
       const userId = (client.data as any).userId;
 
       this.logger.log(`${client.id} subscribed to module ${payload.moduleId}`);
 
-      const leaderboard =
-        await this.leaderboardService.getModuleLeaderboard(
-          payload.moduleId,
-          userId,
-        );
+      const leaderboard = await this.leaderboardService.getModuleLeaderboard(
+        payload.moduleId,
+        userId,
+      );
 
       client.emit(`module-${payload.moduleId}-leaderboard`, leaderboard);
     } catch (error) {
       this.logger.error(
         `Error in subscribe-module: ${error instanceof Error ? error.message : String(error)}`,
       );
-      client.emit('error', { message: 'Failed to fetch leaderboard' });
+      client.emit("error", { message: "Failed to fetch leaderboard" });
     }
   }
 
   async broadcastUpdate() {
     const sockets = await this.server.fetchSockets();
-    
+
     for (const socket of sockets) {
       const userId = (socket.data as any).userId;
-      
+
       try {
-        const leaderboard = 
+        const leaderboard =
           await this.leaderboardService.getCategorizedLeaderboard(userId);
-        socket.emit('leaderboard:update', leaderboard);
+        socket.emit("leaderboard:update", leaderboard);
       } catch (e) {
         this.logger.error(`Failed to broadcast to ${socket.id}: ${e}`);
       }

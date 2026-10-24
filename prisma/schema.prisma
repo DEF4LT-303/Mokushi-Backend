@@ -40,6 +40,8 @@ model User {
   refreshTokens         RefreshToken[]
   rapidFireOverallStats RapidFireOverallStat[]
   rapidFireLessonStats  RapidFireLessonStat[]
+  purchases             UserPurchase[]
+  transactions          Transaction[]
 }
 
 model RefreshToken {
@@ -86,6 +88,7 @@ model Module {
   motivationalQuote  String
   jlptLevel          JlptLevel
   categoryType       CategoryType
+  isFree             Boolean      @default(false)
   questions          Question[]
   quizzes            Quiz[]
   quizConfigs        QuizConfig[]
@@ -327,6 +330,12 @@ model QuizQuestion {
   @@index([questionId])
 }
 
+enum UserAttemptStatus {
+  ONGOING
+  COMPLETED
+  CANCELLED
+}
+
 model UserAttempt {
   id String @id @default(uuid())
 
@@ -340,8 +349,8 @@ model UserAttempt {
 
   score           Int
   normalizedScore Float?
-  completed       Boolean   @default(false)
-  startedAt       DateTime  @default(now())
+  status          UserAttemptStatus @default(ONGOING)
+  startedAt       DateTime          @default(now())
   submittedAt     DateTime?
 
   createdAt DateTime @default(now())
@@ -370,3 +379,61 @@ model UserAnswer {
   @@index([userAttemptId])
   @@index([quizQuestionId])
 }
+
+enum PlanType {
+  N5_BUNDLE
+  N4_BUNDLE
+  RAPID_FIRE_BUNDLE
+  FULL_ACCESS_BUNDLE
+}
+
+model UserPurchase {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planType    PlanType
+  purchasedAt DateTime @default(now())
+
+  @@unique([userId, planType])
+  @@index([userId])
+}
+
+enum TransactionStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+model Transaction {
+  id            String            @id @default(uuid())
+  userId        String
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tranId        String            @unique
+  valId         String?
+  amount        Float
+  currency      String            @default("BDT")
+  planToBuy     PlanType
+  status        TransactionStatus @default(PENDING)
+  paymentMethod String?
+
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@index([userId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  adminId   String
+  action    String
+  targetId  String?
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([adminId])
+  @@index([action])
+  @@index([targetId])
+}
+

@@ -1,8 +1,8 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { LeaderboardController } from './leaderboard.controller';
-import { LeaderboardService } from './leaderboard.service';
+import { Test, TestingModule } from "@nestjs/testing";
+import { LeaderboardController } from "./leaderboard.controller";
+import { LeaderboardService } from "./leaderboard.service";
 
-describe('LeaderboardController', () => {
+describe("LeaderboardController", () => {
   let controller: LeaderboardController;
 
   beforeEach(async () => {
@@ -19,7 +19,7 @@ describe('LeaderboardController', () => {
     controller = module.get<LeaderboardController>(LeaderboardController);
   });
 
-  it('should be defined', () => {
+  it("should be defined", () => {
     expect(controller).toBeDefined();
   });
 });
