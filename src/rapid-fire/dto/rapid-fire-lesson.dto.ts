@@ -13,4 +13,10 @@ export class RapidFireLessonDto {
 
   @ApiProperty({ enum: JlptLevel, description: "JLPT level for this lesson" })
   jlptLevel!: JlptLevel;
+
+  @ApiProperty({
+    description: "Whether this lesson is premium",
+    example: false,
+  })
+  isPremium!: boolean;
 }

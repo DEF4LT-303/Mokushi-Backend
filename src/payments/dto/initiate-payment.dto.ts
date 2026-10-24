@@ -6,7 +6,7 @@ export class InitiatePaymentDto {
   @ApiProperty({
     enum: PlanType,
     description: "The plan or bundle to purchase",
-    example: PlanType.N5_BUNDLE,
+    example: PlanType.N5,
   })
   @IsEnum(PlanType)
   planType: PlanType;

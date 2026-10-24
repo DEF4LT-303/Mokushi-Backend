@@ -72,6 +72,6 @@ export class RapidFireController {
     @Param("lessonId") lessonId: string,
     @Body() body: SubmitRapidFireAnswersDto,
   ) {
-    return this.rapidFireService.submitAnswers(user.id, lessonId, body);
+    return this.rapidFireService.submitAnswers(user.id, lessonId, body, user);
   }
 }

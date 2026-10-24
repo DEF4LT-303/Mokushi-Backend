@@ -14,7 +14,7 @@ export class AdminValidatePurchaseDto {
   @ApiProperty({
     enum: PlanType,
     description: "The plan to grant or validate",
-    example: PlanType.N5_BUNDLE,
+    example: PlanType.N5,
   })
   @IsEnum(PlanType)
   planType: PlanType;

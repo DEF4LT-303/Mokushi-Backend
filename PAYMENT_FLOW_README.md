@@ -74,10 +74,13 @@ Configured in `src/payments/constants/plans.constant.ts`:
 
 | Plan Enum | Display Name | Price (BDT) | Granted Features |
 | :--- | :--- | :---: | :--- |
-| `N5_BUNDLE` | JLPT N5 Master Bundle | ৳499 | All N5 Grammar, Vocabulary, Kanji modules & mock quizzes |
-| `N4_BUNDLE` | JLPT N4 Accelerator Bundle | ৳699 | All N4 Grammar, Vocabulary, Kanji modules & mock quizzes |
-| `RAPID_FIRE_BUNDLE` | Unlimited Rapid Fire Pass | ৳299 | Unlimited daily Rapid Fire practice (removes 3 sessions/day limit) |
-| `FULL_ACCESS_BUNDLE` | Complete Japanese Mastery | ৳999 | Unlocks **all** N5, N4, and unlimited Rapid Fire |
+| `N5` | JLPT N5 | ৳499 | All premium N5 Grammar, Vocabulary, Kanji modules & mock quizzes |
+| `N4` | JLPT N4 | ৳699 | All premium N4 Grammar, Vocabulary, Kanji modules & mock quizzes |
+| `RAPID_FIRE_N5` | Rapid Fire N5 | ৳299 | All premium JLPT N5 Rapid-Fire vocabulary drills |
+| `RAPID_FIRE_N4` | Rapid Fire N4 | ৳399 | All premium JLPT N4 Rapid-Fire vocabulary drills |
+| `N5_N4_BUNDLE` | JLPT N5 + N4 Bundle | ৳999 | All premium JLPT N5 and N4 modules & quizzes (without Rapid Fire) |
+| `N5_RAPID_FIRE_BUNDLE` | JLPT N5 + Rapid Fire Bundle | ৳699 | All premium JLPT N5 modules and JLPT N5 Rapid-Fire drills |
+| `N4_RAPID_FIRE_BUNDLE` | JLPT N4 + Rapid Fire Bundle | ৳899 | All premium JLPT N4 modules and JLPT N4 Rapid-Fire drills |
 
 ---
 
@@ -163,7 +166,7 @@ Initiates a payment session with SSLCommerz.
 - **Body**:
   ```json
   {
-    "planType": "N5_BUNDLE",
+    "planType": "N5",
     "cusPhone": "01700000000",
     "cusAddress": "Dhaka, Bangladesh"
   }
@@ -175,7 +178,7 @@ Initiates a payment session with SSLCommerz.
     "tranId": "MK_1791637967558_1234",
     "amount": 499,
     "currency": "BDT",
-    "planType": "N5_BUNDLE"
+    "planType": "N5"
   }
   ```
 
@@ -232,7 +235,7 @@ Manually validate or grant a plan purchase for a user.
   ```json
   {
     "userId": "uuid-here",
-    "planType": "FULL_ACCESS_BUNDLE",
+    "planType": "N5_N4_BUNDLE",
     "tranId": "optional-existing-tran-id",
     "reason": "VIP grant"
   }
@@ -245,7 +248,7 @@ Manually revoke a plan purchase from a user.
   ```json
   {
     "userId": "uuid-here",
-    "planType": "FULL_ACCESS_BUNDLE",
+    "planType": "N5_N4_BUNDLE",
     "reason": "Customer refunded"
   }
   ```
@@ -273,10 +276,13 @@ Manually triggers the background reconciliation job.
 
 ```prisma
 enum PlanType {
-  N5_BUNDLE
-  N4_BUNDLE
-  RAPID_FIRE_BUNDLE
-  FULL_ACCESS_BUNDLE
+  N5
+  N4
+  RAPID_FIRE_N5
+  RAPID_FIRE_N4
+  N5_N4_BUNDLE
+  N5_RAPID_FIRE_BUNDLE
+  N4_RAPID_FIRE_BUNDLE
 }
 
 enum TransactionStatus {

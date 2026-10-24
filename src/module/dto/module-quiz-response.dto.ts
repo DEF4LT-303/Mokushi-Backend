@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { QuizResponseDto } from "./quiz-response.dto";
 
 export class ModuleInfoDto {
@@ -19,6 +19,9 @@ export class ModuleInfoDto {
 
   @ApiProperty()
   categoryType!: string;
+
+  @ApiPropertyOptional()
+  isPremium?: boolean;
 }
 
 export class ModuleQuizResponseDto {

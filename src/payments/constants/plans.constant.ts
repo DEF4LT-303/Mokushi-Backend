@@ -10,60 +10,101 @@ export interface PlanConfig {
 }
 
 export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
-  [PlanType.N5_BUNDLE]: {
-    planType: PlanType.N5_BUNDLE,
-    title: "JLPT N5 Bundle",
+  [PlanType.N5]: {
+    planType: PlanType.N5,
+    title: "JLPT N5",
     description:
-      "Unlock all JLPT N5 modules, lessons, and quizzes permanently.",
+      "Unlock all premium JLPT N5 modules, lessons, and quizzes permanently.",
     price: 499,
     currency: "BDT",
     features: [
-      "Access all 25+ N5 Grammar and Vocab Modules",
+      "Access all premium N5 Grammar and Vocab Modules",
       "Unlimited N5 Quizzes and Tests",
       "Grammar rule explanations and examples",
       "Lifetime access",
     ],
   },
-  [PlanType.N4_BUNDLE]: {
-    planType: PlanType.N4_BUNDLE,
-    title: "JLPT N4 Bundle",
+  [PlanType.N4]: {
+    planType: PlanType.N4,
+    title: "JLPT N4",
     description:
-      "Unlock all JLPT N4 modules, lessons, and quizzes permanently.",
+      "Unlock all premium JLPT N4 modules, lessons, and quizzes permanently.",
     price: 699,
     currency: "BDT",
     features: [
-      "Access all JLPT N4 intermediate modules",
+      "Access all premium JLPT N4 intermediate modules",
       "Unlimited N4 Quizzes and Practice",
       "Comprehensive grammar and sentence structures",
       "Lifetime access",
     ],
   },
-  [PlanType.RAPID_FIRE_BUNDLE]: {
-    planType: PlanType.RAPID_FIRE_BUNDLE,
-    title: "Unlimited Rapid-Fire",
+  [PlanType.RAPID_FIRE_N5]: {
+    planType: PlanType.RAPID_FIRE_N5,
+    title: "Rapid Fire N5",
     description:
-      "Remove daily drill limits for rapid-fire vocabulary training.",
+      "Unlock all premium JLPT N5 rapid-fire vocabulary drill lessons permanently.",
     price: 299,
     currency: "BDT",
     features: [
-      "Unlimited daily Rapid-Fire sessions",
-      "Master vocabulary and Kanji under time pressure",
+      "Access all premium N5 Rapid-Fire vocabulary drills",
+      "Master N5 vocabulary under time pressure",
       "Hard words tracking and bookmarking",
       "Lifetime access",
     ],
   },
-  [PlanType.FULL_ACCESS_BUNDLE]: {
-    planType: PlanType.FULL_ACCESS_BUNDLE,
-    title: "All-in-One Full Access",
+  [PlanType.RAPID_FIRE_N4]: {
+    planType: PlanType.RAPID_FIRE_N4,
+    title: "Rapid Fire N4",
     description:
-      "Unlock everything: all JLPT modules, quizzes, and unlimited rapid fire.",
+      "Unlock all premium JLPT N4 rapid-fire vocabulary drill lessons permanently.",
+    price: 399,
+    currency: "BDT",
+    features: [
+      "Access all premium N4 Rapid-Fire vocabulary drills",
+      "Master N4 vocabulary under time pressure",
+      "Hard words tracking and bookmarking",
+      "Lifetime access",
+    ],
+  },
+  [PlanType.N5_N4_BUNDLE]: {
+    planType: PlanType.N5_N4_BUNDLE,
+    title: "JLPT N5 + N4 Bundle",
+    description:
+      "Unlock all premium JLPT N5 and N4 modules, lessons, and quizzes (without rapid-fire).",
     price: 999,
     currency: "BDT",
     features: [
-      "Complete JLPT N5 & N4 Modules",
-      "All quizzes, grammar rules, and exercises",
-      "Unlimited Rapid-Fire drills",
-      "Priority future content updates",
+      "All premium JLPT N5 modules, lessons, and quizzes",
+      "All premium JLPT N4 modules, lessons, and quizzes",
+      "Comprehensive grammar rules and practice tests",
+      "Lifetime access",
+    ],
+  },
+  [PlanType.N5_RAPID_FIRE_BUNDLE]: {
+    planType: PlanType.N5_RAPID_FIRE_BUNDLE,
+    title: "JLPT N5 + Rapid Fire Bundle",
+    description:
+      "Unlock all premium JLPT N5 modules, quizzes, and JLPT N5 rapid-fire drills.",
+    price: 699,
+    currency: "BDT",
+    features: [
+      "All premium JLPT N5 modules and quizzes",
+      "All premium JLPT N5 Rapid-Fire vocabulary drills",
+      "Grammar rules, practice tests, and speed drills",
+      "Lifetime access",
+    ],
+  },
+  [PlanType.N4_RAPID_FIRE_BUNDLE]: {
+    planType: PlanType.N4_RAPID_FIRE_BUNDLE,
+    title: "JLPT N4 + Rapid Fire Bundle",
+    description:
+      "Unlock all premium JLPT N4 modules, quizzes, and JLPT N4 rapid-fire drills.",
+    price: 899,
+    currency: "BDT",
+    features: [
+      "All premium JLPT N4 modules and quizzes",
+      "All premium JLPT N4 Rapid-Fire vocabulary drills",
+      "Comprehensive N4 grammar, quizzes, and speed drills",
       "Lifetime access",
     ],
   },

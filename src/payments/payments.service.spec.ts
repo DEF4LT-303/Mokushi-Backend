@@ -64,9 +64,7 @@ describe("PaymentsService", () => {
     it("should return all configured plans", () => {
       const plans = service.getAvailablePlans();
       expect(plans.length).toBe(Object.keys(PLAN_CONFIGS).length);
-      expect(plans.map((p) => p.planType)).toContain(
-        PlanType.FULL_ACCESS_BUNDLE,
-      );
+      expect(plans.map((p) => p.planType)).toContain(PlanType.N5);
     });
   });
 
@@ -76,20 +74,20 @@ describe("PaymentsService", () => {
 
       await expect(
         service.initiatePayment("non-existent-user", {
-          planType: PlanType.N5_BUNDLE,
+          planType: PlanType.N5,
         }),
       ).rejects.toThrow(NotFoundException);
     });
 
-    it("should throw BadRequestException if user already has Full Access Bundle", async () => {
+    it("should throw BadRequestException if user already has superset bundle", async () => {
       mockDatabaseService.user.findUnique.mockResolvedValue({
         id: "user-1",
-        purchases: [{ planType: PlanType.FULL_ACCESS_BUNDLE }],
+        purchases: [{ planType: PlanType.N5_N4_BUNDLE }],
       });
 
       await expect(
         service.initiatePayment("user-1", {
-          planType: PlanType.N5_BUNDLE,
+          planType: PlanType.N5,
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -97,12 +95,12 @@ describe("PaymentsService", () => {
     it("should throw BadRequestException if user already owns the selected plan", async () => {
       mockDatabaseService.user.findUnique.mockResolvedValue({
         id: "user-1",
-        purchases: [{ planType: PlanType.N5_BUNDLE }],
+        purchases: [{ planType: PlanType.N5 }],
       });
 
       await expect(
         service.initiatePayment("user-1", {
-          planType: PlanType.N5_BUNDLE,
+          planType: PlanType.N5,
         }),
       ).rejects.toThrow(BadRequestException);
     });
@@ -125,7 +123,7 @@ describe("PaymentsService", () => {
       };
 
       const result = await service.initiatePayment("user-1", {
-        planType: PlanType.N5_BUNDLE,
+        planType: PlanType.N5,
       });
 
       expect(result.gatewayUrl).toBe(
@@ -136,7 +134,7 @@ describe("PaymentsService", () => {
         expect.objectContaining({
           data: expect.objectContaining({
             userId: "user-1",
-            planToBuy: PlanType.N5_BUNDLE,
+            planToBuy: PlanType.N5,
             status: TransactionStatus.PENDING,
           }),
         }),
@@ -170,9 +168,11 @@ describe("PaymentsService", () => {
         tranId: "MK_123",
         status: TransactionStatus.PENDING,
         amount: 499,
-        planToBuy: PlanType.N5_BUNDLE,
+        planToBuy: PlanType.N5,
       });
-      mockDatabaseService.transaction.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.transaction.updateMany.mockResolvedValue({
+        count: 1,
+      });
 
       (service as any).sslcommerz = {
         validate: jest.fn().mockResolvedValue({
@@ -204,7 +204,7 @@ describe("PaymentsService", () => {
           where: {
             userId_planType: {
               userId: "user-1",
-              planType: PlanType.N5_BUNDLE,
+              planType: PlanType.N5,
             },
           },
         }),
@@ -217,10 +217,12 @@ describe("PaymentsService", () => {
         tranId: "MK_123",
         status: TransactionStatus.PENDING,
         amount: 499,
-        planToBuy: PlanType.N5_BUNDLE,
+        planToBuy: PlanType.N5,
       });
       // Simulate another process winning the atomic transition
-      mockDatabaseService.transaction.updateMany.mockResolvedValue({ count: 0 });
+      mockDatabaseService.transaction.updateMany.mockResolvedValue({
+        count: 0,
+      });
 
       (service as any).sslcommerz = {
         validate: jest.fn().mockResolvedValue({
@@ -247,9 +249,11 @@ describe("PaymentsService", () => {
         tranId: "MK_123",
         status: TransactionStatus.PENDING,
         amount: 499,
-        planToBuy: PlanType.N5_BUNDLE,
+        planToBuy: PlanType.N5,
       });
-      mockDatabaseService.transaction.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.transaction.updateMany.mockResolvedValue({
+        count: 1,
+      });
 
       (service as any).sslcommerz = {
         validate: jest.fn().mockResolvedValue({
@@ -277,9 +281,11 @@ describe("PaymentsService", () => {
         status: TransactionStatus.PENDING,
         amount: 499,
         currency: "BDT",
-        planToBuy: PlanType.N5_BUNDLE,
+        planToBuy: PlanType.N5,
       });
-      mockDatabaseService.transaction.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.transaction.updateMany.mockResolvedValue({
+        count: 1,
+      });
 
       (service as any).sslcommerz = {
         validate: jest.fn().mockResolvedValue({
@@ -311,9 +317,11 @@ describe("PaymentsService", () => {
         status: TransactionStatus.PENDING,
         amount: 499,
         currency: "BDT",
-        planToBuy: PlanType.N5_BUNDLE,
+        planToBuy: PlanType.N5,
       });
-      mockDatabaseService.transaction.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.transaction.updateMany.mockResolvedValue({
+        count: 1,
+      });
 
       (service as any).sslcommerz = {
         validate: jest.fn().mockResolvedValue({
@@ -346,9 +354,11 @@ describe("PaymentsService", () => {
         status: TransactionStatus.PENDING,
         amount: 499,
         currency: "BDT",
-        planToBuy: PlanType.N5_BUNDLE,
+        planToBuy: PlanType.N5,
       });
-      mockDatabaseService.transaction.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.transaction.updateMany.mockResolvedValue({
+        count: 1,
+      });
 
       (service as any).sslcommerz = {
         validate: jest.fn().mockResolvedValue({
@@ -380,9 +390,11 @@ describe("PaymentsService", () => {
         status: TransactionStatus.PENDING,
         amount: 499,
         currency: "BDT",
-        planToBuy: PlanType.N5_BUNDLE,
+        planToBuy: PlanType.N5,
       });
-      mockDatabaseService.transaction.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.transaction.updateMany.mockResolvedValue({
+        count: 1,
+      });
 
       (service as any).sslcommerz = {
         validate: jest.fn().mockResolvedValue({
@@ -410,7 +422,9 @@ describe("PaymentsService", () => {
 
   describe("handlePaymentFailure and handlePaymentCancel", () => {
     it("should set transaction status to FAILED on handlePaymentFailure", async () => {
-      mockDatabaseService.transaction.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.transaction.updateMany.mockResolvedValue({
+        count: 1,
+      });
 
       await service.handlePaymentFailure("MK_123");
 
@@ -421,7 +435,9 @@ describe("PaymentsService", () => {
     });
 
     it("should set transaction status to CANCELLED on handlePaymentCancel", async () => {
-      mockDatabaseService.transaction.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.transaction.updateMany.mockResolvedValue({
+        count: 1,
+      });
 
       await service.handlePaymentCancel("MK_123");
 
@@ -438,13 +454,19 @@ describe("PaymentsService", () => {
         {
           id: "sub-1",
           userId: "user-1",
-          planType: PlanType.N5_BUNDLE,
+          planType: PlanType.N5,
           purchasedAt: new Date(),
-          user: { id: "user-1", email: "test@mokushi.com", fullName: "Test User" },
+          user: {
+            id: "user-1",
+            email: "test@mokushi.com",
+            fullName: "Test User",
+          },
         },
       ];
       mockDatabaseService.userPurchase.count.mockResolvedValue(1);
-      mockDatabaseService.userPurchase.findMany.mockResolvedValue(mockSubscriptions);
+      mockDatabaseService.userPurchase.findMany.mockResolvedValue(
+        mockSubscriptions,
+      );
 
       const result = await service.adminGetSubscriptions({
         skip: 0,
@@ -489,7 +511,7 @@ describe("PaymentsService", () => {
         role: "USER",
       });
       mockDatabaseService.userPurchase.findMany.mockResolvedValue([
-        { planType: PlanType.N5_BUNDLE, purchasedAt: new Date() },
+        { planType: PlanType.N5, purchasedAt: new Date() },
       ]);
       mockDatabaseService.transaction.findMany.mockResolvedValue([
         { tranId: "MK_1", status: TransactionStatus.SUCCESS, amount: 499 },
@@ -500,7 +522,8 @@ describe("PaymentsService", () => {
       expect(result.user.id).toBe("user-1");
       expect(result.accessSummary.hasN5).toBe(true);
       expect(result.accessSummary.hasN4).toBe(false);
-      expect(result.accessSummary.hasFullAccess).toBe(false);
+      expect(result.accessSummary.hasRapidFireN5).toBe(false);
+      expect(result.accessSummary.hasRapidFireN4).toBe(false);
       expect(result.purchases.length).toBe(1);
       expect(result.transactions.length).toBe(1);
     });
@@ -513,7 +536,7 @@ describe("PaymentsService", () => {
       await expect(
         service.adminValidatePurchase({
           userId: "non-existent",
-          planType: PlanType.N5_BUNDLE,
+          planType: PlanType.N5,
         }),
       ).rejects.toThrow(NotFoundException);
     });
@@ -525,7 +548,7 @@ describe("PaymentsService", () => {
       await expect(
         service.adminValidatePurchase({
           userId: "user-1",
-          planType: PlanType.N5_BUNDLE,
+          planType: PlanType.N5,
           tranId: "NON_EXISTENT_TX",
         }),
       ).rejects.toThrow(NotFoundException);
@@ -542,7 +565,7 @@ describe("PaymentsService", () => {
       await expect(
         service.adminValidatePurchase({
           userId: "user-1",
-          planType: PlanType.N5_BUNDLE,
+          planType: PlanType.N5,
           tranId: "MK_OTHER",
         }),
       ).rejects.toThrow(BadRequestException);
@@ -561,13 +584,13 @@ describe("PaymentsService", () => {
       });
       mockDatabaseService.userPurchase.upsert.mockResolvedValue({
         userId: "user-1",
-        planType: PlanType.N5_BUNDLE,
+        planType: PlanType.N5,
       });
 
       const result = await service.adminValidatePurchase(
         {
           userId: "user-1",
-          planType: PlanType.N5_BUNDLE,
+          planType: PlanType.N5,
           tranId: "MK_PENDING",
           reason: "Offline bank transfer",
         },
@@ -589,7 +612,7 @@ describe("PaymentsService", () => {
           where: {
             userId_planType: {
               userId: "user-1",
-              planType: PlanType.N5_BUNDLE,
+              planType: PlanType.N5,
             },
           },
         }),
@@ -613,13 +636,13 @@ describe("PaymentsService", () => {
       });
       mockDatabaseService.userPurchase.upsert.mockResolvedValue({
         userId: "user-1",
-        planType: PlanType.FULL_ACCESS_BUNDLE,
+        planType: PlanType.N5_N4_BUNDLE,
       });
 
       const result = await service.adminValidatePurchase(
         {
           userId: "user-1",
-          planType: PlanType.FULL_ACCESS_BUNDLE,
+          planType: PlanType.N5_N4_BUNDLE,
         },
         "admin-123",
       );
@@ -629,7 +652,7 @@ describe("PaymentsService", () => {
         expect.objectContaining({
           data: expect.objectContaining({
             userId: "user-1",
-            planToBuy: PlanType.FULL_ACCESS_BUNDLE,
+            planToBuy: PlanType.N5_N4_BUNDLE,
             status: TransactionStatus.SUCCESS,
           }),
         }),
@@ -653,7 +676,7 @@ describe("PaymentsService", () => {
       await expect(
         service.adminInvalidatePurchase({
           userId: "non-existent",
-          planType: PlanType.N5_BUNDLE,
+          planType: PlanType.N5,
         }),
       ).rejects.toThrow(NotFoundException);
     });
@@ -665,7 +688,7 @@ describe("PaymentsService", () => {
       await expect(
         service.adminInvalidatePurchase({
           userId: "user-1",
-          planType: PlanType.N5_BUNDLE,
+          planType: PlanType.N5,
         }),
       ).rejects.toThrow(NotFoundException);
     });
@@ -674,7 +697,7 @@ describe("PaymentsService", () => {
       mockDatabaseService.user.findUnique.mockResolvedValue({ id: "user-1" });
       mockDatabaseService.userPurchase.findUnique.mockResolvedValue({
         userId: "user-1",
-        planType: PlanType.N5_BUNDLE,
+        planType: PlanType.N5,
       });
       mockDatabaseService.userPurchase.delete.mockResolvedValue({});
       mockDatabaseService.transaction.findFirst.mockResolvedValue({
@@ -686,7 +709,7 @@ describe("PaymentsService", () => {
       const result = await service.adminInvalidatePurchase(
         {
           userId: "user-1",
-          planType: PlanType.N5_BUNDLE,
+          planType: PlanType.N5,
           reason: "Refund processed",
         },
         "admin-123",
@@ -697,7 +720,7 @@ describe("PaymentsService", () => {
         where: {
           userId_planType: {
             userId: "user-1",
-            planType: PlanType.N5_BUNDLE,
+            planType: PlanType.N5,
           },
         },
       });
@@ -787,7 +810,7 @@ describe("PaymentsService", () => {
         status: TransactionStatus.PENDING,
         amount: 499,
         currency: "BDT",
-        planToBuy: PlanType.N5_BUNDLE,
+        planToBuy: PlanType.N5,
         userId: "user-1",
         createdAt: new Date(Date.now() - 30 * 60 * 1000),
       };
@@ -798,7 +821,9 @@ describe("PaymentsService", () => {
       mockDatabaseService.transaction.findUnique.mockResolvedValue(
         mockPendingTx,
       );
-      mockDatabaseService.transaction.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.transaction.updateMany.mockResolvedValue({
+        count: 1,
+      });
       mockDatabaseService.userPurchase.upsert.mockResolvedValue({});
 
       (service as any).sslcommerz = {
@@ -836,7 +861,7 @@ describe("PaymentsService", () => {
         status: TransactionStatus.PENDING,
         amount: 499,
         currency: "BDT",
-        planToBuy: PlanType.N5_BUNDLE,
+        planToBuy: PlanType.N5,
         userId: "user-1",
         createdAt: new Date(Date.now() - 3 * 60 * 60 * 1000),
       };
@@ -844,7 +869,9 @@ describe("PaymentsService", () => {
       mockDatabaseService.transaction.findMany.mockResolvedValue([
         mockAbandonedTx,
       ]);
-      mockDatabaseService.transaction.updateMany.mockResolvedValue({ count: 1 });
+      mockDatabaseService.transaction.updateMany.mockResolvedValue({
+        count: 1,
+      });
 
       (service as any).sslcommerz = {
         transactionQueryByTransactionId: jest.fn().mockResolvedValue({
@@ -860,6 +887,54 @@ describe("PaymentsService", () => {
         where: { tranId: "MK_ABANDONED", status: TransactionStatus.PENDING },
         data: { status: TransactionStatus.FAILED },
       });
+    });
+  });
+
+  describe("getFrontendRedirectUrl", () => {
+    const originalFrontendUrl = process.env.FRONTEND_URL;
+
+    afterEach(() => {
+      process.env.FRONTEND_URL = originalFrontendUrl;
+    });
+
+    it("should redirect to /payment-status with status and tran_id for success status", () => {
+      process.env.FRONTEND_URL = "https://mokushiken.com";
+      const url = service.getFrontendRedirectUrl("success", "MK_SUCCESS_1");
+      expect(url).toBe(
+        "https://mokushiken.com/payment-status?status=success&tran_id=MK_SUCCESS_1",
+      );
+    });
+
+    it("should redirect to /payment-status with status and tran_id for failed status", () => {
+      process.env.FRONTEND_URL = "https://mokushiken.com";
+      const url = service.getFrontendRedirectUrl("failed", "MK_FAILED_1");
+      expect(url).toBe(
+        "https://mokushiken.com/payment-status?status=failed&tran_id=MK_FAILED_1",
+      );
+    });
+
+    it("should redirect to /payment-status with status and tran_id for cancelled status", () => {
+      process.env.FRONTEND_URL = "https://mokushiken.com";
+      const url = service.getFrontendRedirectUrl("cancelled", "MK_CANCEL_1");
+      expect(url).toBe(
+        "https://mokushiken.com/payment-status?status=cancelled&tran_id=MK_CANCEL_1",
+      );
+    });
+
+    it("should normalize trailing slashes on FRONTEND_URL", () => {
+      process.env.FRONTEND_URL = "https://mokushiken.com/";
+      const url = service.getFrontendRedirectUrl("success", "MK_SUCCESS_2");
+      expect(url).toBe(
+        "https://mokushiken.com/payment-status?status=success&tran_id=MK_SUCCESS_2",
+      );
+    });
+
+    it("should fallback to localhost if FRONTEND_URL is not set", () => {
+      delete process.env.FRONTEND_URL;
+      const url = service.getFrontendRedirectUrl("success", "MK_LOCAL");
+      expect(url).toBe(
+        "http://localhost:5173/payment-status?status=success&tran_id=MK_LOCAL",
+      );
     });
   });
 });
