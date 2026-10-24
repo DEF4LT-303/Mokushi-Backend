@@ -28,7 +28,11 @@ export class PaymentsService {
     const storePassword = process.env.SSLCOMMERZ_STORE_PASSWORD || "qwerty";
     this.isLive = process.env.SSLCOMMERZ_IS_LIVE === "true";
 
-    this.sslcommerz = new SSLCommerzPayment(this.storeId, storePassword, this.isLive);
+    this.sslcommerz = new SSLCommerzPayment(
+      this.storeId,
+      storePassword,
+      this.isLive,
+    );
     this.logger.log(
       `SSL Commerz initialized in ${this.isLive ? "LIVE" : "SANDBOX"} mode with Store ID: ${this.storeId}`,
     );
@@ -53,21 +57,40 @@ export class PaymentsService {
       throw new BadRequestException("Invalid plan selected");
     }
 
-    const hasFullAccess = user.purchases.some(
-      (p) => p.planType === PlanType.FULL_ACCESS_BUNDLE,
-    );
-    if (hasFullAccess) {
-      throw new BadRequestException(
-        "You already have the Full Access Bundle which includes all features.",
-      );
-    }
-
     const alreadyPurchased = user.purchases.some(
       (p) => p.planType === dto.planType,
     );
     if (alreadyPurchased) {
       throw new BadRequestException(
         `You have already purchased the ${planConfig.title}.`,
+      );
+    }
+
+    const hasExistingCoverage =
+      (dto.planType === PlanType.N5 &&
+        user.purchases.some(
+          (p) =>
+            p.planType === PlanType.N5_N4_BUNDLE ||
+            p.planType === PlanType.N5_RAPID_FIRE_BUNDLE,
+        )) ||
+      (dto.planType === PlanType.N4 &&
+        user.purchases.some(
+          (p) =>
+            p.planType === PlanType.N5_N4_BUNDLE ||
+            p.planType === PlanType.N4_RAPID_FIRE_BUNDLE,
+        )) ||
+      (dto.planType === PlanType.RAPID_FIRE_N5 &&
+        user.purchases.some(
+          (p) => p.planType === PlanType.N5_RAPID_FIRE_BUNDLE,
+        )) ||
+      (dto.planType === PlanType.RAPID_FIRE_N4 &&
+        user.purchases.some(
+          (p) => p.planType === PlanType.N4_RAPID_FIRE_BUNDLE,
+        ));
+
+    if (hasExistingCoverage) {
+      throw new BadRequestException(
+        "You already have access to this content through an existing bundle.",
       );
     }
 
@@ -351,7 +374,10 @@ export class PaymentsService {
     status: "success" | "failed" | "cancelled",
     tranId: string,
   ): string {
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = (
+      process.env.FRONTEND_URL || "http://localhost:5173"
+    ).replace(/\/+$/, "");
+
     return `${frontendUrl}/payment-status?status=${status}&tran_id=${tranId || ""}`;
   }
 
@@ -436,34 +462,43 @@ export class PaymentsService {
       }),
     ]);
 
-    const hasFullAccess = purchases.some(
-      (p) => p.planType === PlanType.FULL_ACCESS_BUNDLE,
+    const hasN5 = purchases.some(
+      (p) =>
+        p.planType === PlanType.N5 ||
+        p.planType === PlanType.N5_N4_BUNDLE ||
+        p.planType === PlanType.N5_RAPID_FIRE_BUNDLE,
     );
-    const hasN5 =
-      hasFullAccess || purchases.some((p) => p.planType === PlanType.N5_BUNDLE);
-    const hasN4 =
-      hasFullAccess || purchases.some((p) => p.planType === PlanType.N4_BUNDLE);
-    const hasRapidFire =
-      hasFullAccess ||
-      purchases.some((p) => p.planType === PlanType.RAPID_FIRE_BUNDLE);
+    const hasN4 = purchases.some(
+      (p) =>
+        p.planType === PlanType.N4 ||
+        p.planType === PlanType.N5_N4_BUNDLE ||
+        p.planType === PlanType.N4_RAPID_FIRE_BUNDLE,
+    );
+    const hasRapidFireN5 = purchases.some(
+      (p) =>
+        p.planType === PlanType.RAPID_FIRE_N5 ||
+        p.planType === PlanType.N5_RAPID_FIRE_BUNDLE,
+    );
+    const hasRapidFireN4 = purchases.some(
+      (p) =>
+        p.planType === PlanType.RAPID_FIRE_N4 ||
+        p.planType === PlanType.N4_RAPID_FIRE_BUNDLE,
+    );
 
     return {
       user,
       accessSummary: {
-        hasFullAccess,
         hasN5,
         hasN4,
-        hasRapidFire,
+        hasRapidFireN5,
+        hasRapidFireN4,
       },
       purchases,
       transactions,
     };
   }
 
-  async adminValidatePurchase(
-    dto: AdminValidatePurchaseDto,
-    adminId?: string,
-  ) {
+  async adminValidatePurchase(dto: AdminValidatePurchaseDto, adminId?: string) {
     const user = await this.databaseService.user.findUnique({
       where: { id: dto.userId },
     });
@@ -578,15 +613,16 @@ export class PaymentsService {
       throw new NotFoundException("User not found");
     }
 
-    const existingPurchase =
-      await this.databaseService.userPurchase.findUnique({
+    const existingPurchase = await this.databaseService.userPurchase.findUnique(
+      {
         where: {
           userId_planType: {
             userId: dto.userId,
             planType: dto.planType,
           },
         },
-      });
+      },
+    );
 
     if (!existingPurchase) {
       throw new NotFoundException(
@@ -760,8 +796,8 @@ export class PaymentsService {
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
 
-    const pendingTransactions =
-      await this.databaseService.transaction.findMany({
+    const pendingTransactions = await this.databaseService.transaction.findMany(
+      {
         where: {
           status: TransactionStatus.PENDING,
           createdAt: {
@@ -771,7 +807,8 @@ export class PaymentsService {
         },
         take: batchSize,
         orderBy: { createdAt: "asc" },
-      });
+      },
+    );
 
     let fulfilled = 0;
     let expired = 0;

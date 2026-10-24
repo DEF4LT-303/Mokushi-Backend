@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { JlptLevel } from "@prisma/client";
 import { RapidFireLessonStatDto } from "./lesson-stat.dto";
 import { OverallStatsDto } from "./overall-stats.dto";
@@ -13,6 +13,12 @@ export class RapidFireLessonOverviewDto {
 
   @ApiProperty({ description: "Lesson number within the module", example: 1 })
   lessonNumber!: number;
+
+  @ApiPropertyOptional({
+    description: "Whether this lesson is premium",
+    example: false,
+  })
+  isPremium?: boolean;
 
   @ApiProperty({
     enum: JlptLevel,

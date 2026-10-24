@@ -158,7 +158,7 @@ npm run lint
 - When reading enum parameters from queries or params (such as `jlptLevel` or `categoryType`), always normalize the case (e.g., `jlptLevel?.toUpperCase() as JlptLevel`) before querying Prisma to prevent `PrismaClientValidationError`.
 
 ### Payment Flow & Entitlements
-- **Bundle Types:** `N5_BUNDLE`, `N4_BUNDLE`, `RAPID_FIRE_BUNDLE`, `FULL_ACCESS_BUNDLE`.
+- **Plan & Bundle Types:** `N5`, `N4`, `RAPID_FIRE_N5`, `RAPID_FIRE_N4`, `N5_N4_BUNDLE`, `N5_RAPID_FIRE_BUNDLE`, `N4_RAPID_FIRE_BUNDLE`.
 - **Concurrency & TOCTOU Defense:** When SSLCommerz triggers browser redirect (`/success`) and webhook (`/ipn`) concurrently, fulfillment executes an atomic conditional update:
   ```sql
   UPDATE Transaction SET status = 'SUCCESS' WHERE tranId = ? AND status = 'PENDING'
@@ -166,8 +166,9 @@ npm run lint
   Only the winning query provisions the `UserPurchase` row; concurrent executions resolve idempotently.
 - **Fraud Checks:** Validations verify gateway `status === "VALID"`, amount match, currency match (`BDT`), store ID match, and transaction ID match.
 - **Entitlement Checks:**
-  - Non-free modules require `FULL_ACCESS_BUNDLE`, `N5_BUNDLE`, or `N4_BUNDLE`.
-  - Rapid-fire drills allow 3 free sessions/day; unlimited sessions require `RAPID_FIRE_BUNDLE` or `FULL_ACCESS_BUNDLE`.
+  - Premium modules (`isPremium: true`) require `N5`, `N5_N4_BUNDLE`, or `N5_RAPID_FIRE_BUNDLE` for N5, and `N4`, `N5_N4_BUNDLE`, or `N4_RAPID_FIRE_BUNDLE` for N4.
+  - Premium rapid-fire lessons (`isPremium: true`) require `RAPID_FIRE_N5` or `N5_RAPID_FIRE_BUNDLE` for N5, and `RAPID_FIRE_N4` or `N4_RAPID_FIRE_BUNDLE` for N4.
+  - Content with `isPremium: false` is accessible by regular users without purchasing a plan.
   - Role `ADMIN` bypasses all purchase restrictions.
 
 ---

@@ -3,6 +3,7 @@ import { CategoryType, JlptLevel } from "@prisma/client";
 import { Type } from "class-transformer";
 import {
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -68,11 +69,12 @@ export class CreateModuleDto {
   categoryType!: CategoryType;
 
   @ApiPropertyOptional({
-    description: "Whether this module is accessible for free",
+    description: "Whether this module is premium (locked for regular users)",
     default: false,
   })
   @IsOptional()
-  isFree?: boolean;
+  @IsBoolean()
+  isPremium?: boolean;
 
   @ApiPropertyOptional({
     description: "Optional Rule ID associated with this module",

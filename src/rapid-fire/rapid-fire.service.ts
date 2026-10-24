@@ -40,6 +40,7 @@ export class RapidFireService {
           id: true,
           title: true,
           lessonNumber: true,
+          isPremium: true,
           _count: { select: { words: true } },
         },
         orderBy: { lessonNumber: "asc" },
@@ -76,6 +77,7 @@ export class RapidFireService {
         lessonId: lesson.id,
         lessonNumber: lesson.lessonNumber,
         lessonTitle: lesson.title,
+        isPremium: lesson.isPremium,
         totalWords: lesson._count.words,
         masteryRate: stat?.masteryRate ?? 0,
         hardWordCount: hardCountByLesson[lesson.id] ?? 0,
@@ -135,35 +137,34 @@ export class RapidFireService {
       );
     }
 
-    // Check bundle ownership and enforce free daily practice limit
-    const userPurchases =
-      user?.purchases ||
-      (await this.databaseService.userPurchase.findMany({
-        where: { userId },
-        select: { planType: true },
-      }));
+    // Access control: if lesson is premium and user is not admin, verify plan purchase
+    if (rapidFireLesson.isPremium && user?.role !== Role.ADMIN) {
+      const userPurchases =
+        user?.purchases ||
+        (await this.databaseService.userPurchase.findMany({
+          where: { userId },
+          select: { planType: true },
+        }));
 
-    const hasUnlimited =
-      user?.role === Role.ADMIN ||
-      userPurchases.some(
-        (p: any) =>
-          p.planType === PlanType.RAPID_FIRE_BUNDLE ||
-          p.planType === PlanType.FULL_ACCESS_BUNDLE,
-      );
+      const hasAccess =
+        (rapidFireLesson.jlptLevel === JlptLevel.N5 &&
+          userPurchases.some(
+            (p: any) =>
+              p.planType === PlanType.RAPID_FIRE_N5 ||
+              p.planType === PlanType.N5_RAPID_FIRE_BUNDLE,
+          )) ||
+        (rapidFireLesson.jlptLevel === JlptLevel.N4 &&
+          userPurchases.some(
+            (p: any) =>
+              p.planType === PlanType.RAPID_FIRE_N4 ||
+              p.planType === PlanType.N4_RAPID_FIRE_BUNDLE,
+          ));
 
-    if (!hasUnlimited) {
-      const today = new Date().toISOString().slice(0, 10);
-      const cacheKey = `rapidfire:daily_count:${userId}:${today}`;
-      const currentCount = (await this.cache.get(cacheKey)) || 0;
-      const MAX_FREE_DAILY = 3;
-
-      if (currentCount >= MAX_FREE_DAILY) {
+      if (!hasAccess) {
         throw new ForbiddenException(
-          `Daily free Rapid-Fire practice limit reached (${MAX_FREE_DAILY}/${MAX_FREE_DAILY}). Please unlock the Rapid-Fire Bundle or Full Access Bundle for unlimited practice.`,
+          `Rapid-Fire lesson '${rapidFireLesson.title}' is locked. Please unlock the Rapid Fire ${rapidFireLesson.jlptLevel} plan or bundle to practice.`,
         );
       }
-
-      await this.cache.set(cacheKey, currentCount + 1, 86400);
     }
 
     const overallStat = await this.getOrCreateOverallStat(
@@ -195,6 +196,7 @@ export class RapidFireService {
       lessonId: rapidFireLesson.id,
       lessonTitle: rapidFireLesson.title,
       lessonNumber: rapidFireLesson.lessonNumber,
+      isPremium: rapidFireLesson.isPremium,
       jlptLevel: rapidFireLesson.jlptLevel,
       words: rapidFireLesson.words.map((word: any) =>
         this.mapWordToDto(word, hardIds.has(word.id)),
@@ -230,6 +232,7 @@ export class RapidFireService {
     userId: string,
     lessonId: string,
     dto: SubmitRapidFireAnswersDto,
+    user?: any,
   ): Promise<SubmitRapidFireAnswersResponseDto> {
     if (!dto.answers || dto.answers.length === 0) {
       throw new BadRequestException("At least one answer is required");
@@ -250,6 +253,36 @@ export class RapidFireService {
       throw new NotFoundException(
         `Rapid-fire lesson for id '${lessonId}' not found`,
       );
+    }
+
+    // Access control: if lesson is premium and user is not admin, verify plan purchase
+    if (rapidFireLesson.isPremium && user?.role !== Role.ADMIN) {
+      const userPurchases =
+        user?.purchases ||
+        (await this.databaseService.userPurchase.findMany({
+          where: { userId },
+          select: { planType: true },
+        }));
+
+      const hasAccess =
+        (rapidFireLesson.jlptLevel === JlptLevel.N5 &&
+          userPurchases.some(
+            (p: any) =>
+              p.planType === PlanType.RAPID_FIRE_N5 ||
+              p.planType === PlanType.N5_RAPID_FIRE_BUNDLE,
+          )) ||
+        (rapidFireLesson.jlptLevel === JlptLevel.N4 &&
+          userPurchases.some(
+            (p: any) =>
+              p.planType === PlanType.RAPID_FIRE_N4 ||
+              p.planType === PlanType.N4_RAPID_FIRE_BUNDLE,
+          ));
+
+      if (!hasAccess) {
+        throw new ForbiddenException(
+          `Rapid-Fire lesson '${rapidFireLesson.title}' is locked. Please unlock the Rapid Fire ${rapidFireLesson.jlptLevel} plan or bundle to practice.`,
+        );
+      }
     }
 
     const validWordIds = new Set(

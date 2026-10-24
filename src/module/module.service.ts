@@ -201,8 +201,8 @@ export class ModuleService {
       );
     }
 
-    // Access control: if module is not free and user is not admin, verify bundle purchase
-    if (!module.isFree && user?.role !== Role.ADMIN) {
+    // Access control: if module is premium and user is not admin, verify bundle purchase
+    if (module.isPremium && user?.role !== Role.ADMIN) {
       const userPurchases =
         user?.purchases ||
         (user?.id
@@ -212,24 +212,26 @@ export class ModuleService {
             })
           : []);
 
-      const hasFullAccess = userPurchases.some(
-        (p: any) => p.planType === PlanType.FULL_ACCESS_BUNDLE,
-      );
       const hasN5 = userPurchases.some(
-        (p: any) => p.planType === PlanType.N5_BUNDLE,
+        (p: any) =>
+          p.planType === PlanType.N5 ||
+          p.planType === PlanType.N5_N4_BUNDLE ||
+          p.planType === PlanType.N5_RAPID_FIRE_BUNDLE,
       );
       const hasN4 = userPurchases.some(
-        (p: any) => p.planType === PlanType.N4_BUNDLE,
+        (p: any) =>
+          p.planType === PlanType.N4 ||
+          p.planType === PlanType.N5_N4_BUNDLE ||
+          p.planType === PlanType.N4_RAPID_FIRE_BUNDLE,
       );
 
       const hasAccess =
-        hasFullAccess ||
         (module.jlptLevel === JlptLevel.N5 && hasN5) ||
         (module.jlptLevel === JlptLevel.N4 && hasN4);
 
       if (!hasAccess) {
         throw new ForbiddenException(
-          `Module '${module.name}' is locked. Please unlock the ${module.jlptLevel} Bundle or Full Access Bundle to take quizzes.`,
+          `Module '${module.name}' is locked. Please unlock the ${module.jlptLevel} plan or bundle to take quizzes.`,
         );
       }
     }
@@ -274,6 +276,7 @@ export class ModuleService {
         description: module.description,
         jlptLevel: module.jlptLevel,
         categoryType: module.categoryType,
+        isPremium: module.isPremium,
       },
       quiz: {
         id: quiz.id,

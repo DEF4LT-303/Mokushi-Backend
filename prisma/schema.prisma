@@ -88,7 +88,7 @@ model Module {
   motivationalQuote  String
   jlptLevel          JlptLevel
   categoryType       CategoryType
-  isFree             Boolean      @default(false)
+  isPremium          Boolean      @default(false)
   questions          Question[]
   quizzes            Quiz[]
   quizConfigs        QuizConfig[]
@@ -124,6 +124,7 @@ model RapidFireLesson {
   title        String
   lessonNumber Int
   jlptLevel    JlptLevel              @default(N5)
+  isPremium    Boolean                @default(false)
   words        RapidFireWord[]
   practicedBy  RapidFireOverallStat[]
 
@@ -381,10 +382,13 @@ model UserAnswer {
 }
 
 enum PlanType {
-  N5_BUNDLE
-  N4_BUNDLE
-  RAPID_FIRE_BUNDLE
-  FULL_ACCESS_BUNDLE
+  N5
+  N4
+  RAPID_FIRE_N5
+  RAPID_FIRE_N4
+  N5_N4_BUNDLE
+  N5_RAPID_FIRE_BUNDLE
+  N4_RAPID_FIRE_BUNDLE
 }
 
 model UserPurchase {

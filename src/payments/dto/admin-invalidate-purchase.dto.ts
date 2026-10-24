@@ -14,7 +14,7 @@ export class AdminInvalidatePurchaseDto {
   @ApiProperty({
     enum: PlanType,
     description: "The plan to invalidate or revoke",
-    example: PlanType.N5_BUNDLE,
+    example: PlanType.N5,
   })
   @IsEnum(PlanType)
   planType: PlanType;

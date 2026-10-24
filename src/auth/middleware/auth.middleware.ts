@@ -5,7 +5,10 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { NextFunction, Request, Response } from "express";
-import { clearAuthCookies, getCookieOptions } from "src/common/utils/cookie.helpers";
+import {
+  clearAuthCookies,
+  getCookieOptions,
+} from "src/common/utils/cookie.helpers";
 import { hashToken } from "src/common/utils/jwt.helpers";
 import { DatabaseService } from "src/database/database.service";
 

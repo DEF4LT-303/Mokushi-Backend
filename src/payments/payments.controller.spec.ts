@@ -19,27 +19,41 @@ describe("PaymentsController", () => {
       handlePaymentCancel: jest.fn().mockResolvedValue(undefined),
       getUserPurchases: jest.fn().mockResolvedValue([]),
       getUserTransactions: jest.fn().mockResolvedValue([]),
-      adminGetSubscriptions: jest.fn().mockResolvedValue({ total: 1, count: 1, subscriptions: [] }),
+      adminGetSubscriptions: jest
+        .fn()
+        .mockResolvedValue({ total: 1, count: 1, subscriptions: [] }),
       adminGetUserSubscriptions: jest.fn().mockResolvedValue({
         user: { id: "user-123" },
-        accessSummary: { hasFullAccess: false, hasN5: true, hasN4: false, hasRapidFire: false },
+        accessSummary: {
+          hasFullAccess: false,
+          hasN5: true,
+          hasN4: false,
+          hasRapidFire: false,
+        },
         purchases: [],
         transactions: [],
       }),
-      adminGetAllTransactions: jest.fn().mockResolvedValue({ total: 1, count: 1, transactions: [] }),
-      adminValidatePurchase: jest.fn().mockResolvedValue({ message: "Purchase successfully validated" }),
-      adminInvalidatePurchase: jest.fn().mockResolvedValue({ message: "Purchase successfully invalidated" }),
-      adminGetAuditLogs: jest.fn().mockResolvedValue({ total: 1, count: 1, logs: [] }),
+      adminGetAllTransactions: jest
+        .fn()
+        .mockResolvedValue({ total: 1, count: 1, transactions: [] }),
+      adminValidatePurchase: jest
+        .fn()
+        .mockResolvedValue({ message: "Purchase successfully validated" }),
+      adminInvalidatePurchase: jest
+        .fn()
+        .mockResolvedValue({ message: "Purchase successfully invalidated" }),
+      adminGetAuditLogs: jest
+        .fn()
+        .mockResolvedValue({ total: 1, count: 1, logs: [] }),
       reconcilePendingTransactions: jest.fn().mockResolvedValue({
         checked: 1,
         fulfilled: 1,
         expired: 0,
         failed: 0,
       }),
-      getFrontendRedirectUrl: jest.fn(
-        (status, tranId) =>
-          `http://localhost:5173/payment-status?status=${status}&tran_id=${tranId}`,
-      ),
+      getFrontendRedirectUrl: jest.fn((status, tranId) => {
+        return `http://localhost:5173/payment-status?status=${status}&tran_id=${tranId}`;
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -69,7 +83,7 @@ describe("PaymentsController", () => {
   describe("initiatePayment", () => {
     it("should call initiatePayment with user id and dto", async () => {
       const user = { id: "user-123" };
-      const dto = { planType: PlanType.N5_BUNDLE };
+      const dto = { planType: PlanType.N5 };
 
       const result = await controller.initiatePayment(user, dto);
       expect(mockPaymentsService.initiatePayment).toHaveBeenCalledWith(
@@ -101,7 +115,11 @@ describe("PaymentsController", () => {
       const mockRes: any = {
         redirect: jest.fn(),
       };
-      const query = { tran_id: "MK_QUERY", val_id: "VAL_QUERY", card_type: "NAGAD" };
+      const query = {
+        tran_id: "MK_QUERY",
+        val_id: "VAL_QUERY",
+        card_type: "NAGAD",
+      };
 
       await controller.handleSuccess({}, mockRes, query);
 
@@ -196,24 +214,37 @@ describe("PaymentsController", () => {
 
   describe("Admin Endpoints", () => {
     it("should call adminGetSubscriptions with parsed query params", async () => {
-      await controller.adminGetSubscriptions("0", "10", "user-1", PlanType.N5_BUNDLE, "test");
+      await controller.adminGetSubscriptions(
+        "0",
+        "10",
+        "user-1",
+        PlanType.N5,
+        "test",
+      );
       expect(mockPaymentsService.adminGetSubscriptions).toHaveBeenCalledWith({
         skip: 0,
         take: 10,
         userId: "user-1",
-        planType: PlanType.N5_BUNDLE,
+        planType: PlanType.N5,
         search: "test",
       });
     });
 
     it("should call adminGetUserSubscriptions with userId", async () => {
       const result = await controller.adminGetUserSubscriptions("user-123");
-      expect(mockPaymentsService.adminGetUserSubscriptions).toHaveBeenCalledWith("user-123");
+      expect(
+        mockPaymentsService.adminGetUserSubscriptions,
+      ).toHaveBeenCalledWith("user-123");
       expect(result.user.id).toBe("user-123");
     });
 
     it("should call adminGetAllTransactions with parsed query params", async () => {
-      await controller.adminGetAllTransactions("0", "20", "user-123", undefined);
+      await controller.adminGetAllTransactions(
+        "0",
+        "20",
+        "user-123",
+        undefined,
+      );
       expect(mockPaymentsService.adminGetAllTransactions).toHaveBeenCalledWith({
         skip: 0,
         take: 20,
@@ -225,23 +256,35 @@ describe("PaymentsController", () => {
     it("should call adminValidatePurchase with dto and adminId", async () => {
       const dto = {
         userId: "user-123",
-        planType: PlanType.N5_BUNDLE,
+        planType: PlanType.N5,
         tranId: "MK_123",
         reason: "Offline cash",
       };
-      const result = await controller.adminValidatePurchase({ id: "admin-1" }, dto);
-      expect(mockPaymentsService.adminValidatePurchase).toHaveBeenCalledWith(dto, "admin-1");
+      const result = await controller.adminValidatePurchase(
+        { id: "admin-1" },
+        dto,
+      );
+      expect(mockPaymentsService.adminValidatePurchase).toHaveBeenCalledWith(
+        dto,
+        "admin-1",
+      );
       expect(result.message).toBe("Purchase successfully validated");
     });
 
     it("should call adminInvalidatePurchase with dto and adminId", async () => {
       const dto = {
         userId: "user-123",
-        planType: PlanType.N5_BUNDLE,
+        planType: PlanType.N5,
         reason: "Customer requested refund",
       };
-      const result = await controller.adminInvalidatePurchase({ id: "admin-1" }, dto);
-      expect(mockPaymentsService.adminInvalidatePurchase).toHaveBeenCalledWith(dto, "admin-1");
+      const result = await controller.adminInvalidatePurchase(
+        { id: "admin-1" },
+        dto,
+      );
+      expect(mockPaymentsService.adminInvalidatePurchase).toHaveBeenCalledWith(
+        dto,
+        "admin-1",
+      );
       expect(result.message).toBe("Purchase successfully invalidated");
     });
 

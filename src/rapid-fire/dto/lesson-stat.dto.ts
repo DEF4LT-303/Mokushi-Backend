@@ -11,6 +11,12 @@ export class RapidFireLessonStatDto {
   @ApiProperty({ description: "Lesson number within the module", example: 1 })
   lessonNumber!: number;
 
+  @ApiPropertyOptional({
+    description: "Whether this lesson is premium",
+    example: false,
+  })
+  isPremium?: boolean;
+
   @ApiProperty({
     description: "Total words available for this lesson",
     example: 15,
