@@ -391,12 +391,40 @@ enum PlanType {
   N4_RAPID_FIRE_BUNDLE
 }
 
+enum PlanCategory {
+  CORE_MODULE
+  RAPID_FIRE
+  BUNDLE
+}
+
+model PaymentPlan {
+  id          String        @id @default(uuid())
+  planType    PlanType      @unique
+  category    PlanCategory
+  title       String
+  description String        @db.Text
+  price       Float
+  currency    String        @default("BDT")
+  features    Json?
+  isActive    Boolean       @default(true)
+
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  userPurchases UserPurchase[]
+  transactions  Transaction[]
+
+  @@index([category])
+  @@index([isActive])
+}
+
 model UserPurchase {
-  id          String   @id @default(uuid())
+  id          String       @id @default(uuid())
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   planType    PlanType
-  purchasedAt DateTime @default(now())
+  plan        PaymentPlan  @relation(fields: [planType], references: [planType], onDelete: Restrict)
+  purchasedAt DateTime     @default(now())
 
   @@unique([userId, planType])
   @@index([userId])
@@ -418,6 +446,7 @@ model Transaction {
   amount        Float
   currency      String            @default("BDT")
   planToBuy     PlanType
+  plan          PaymentPlan       @relation(fields: [planToBuy], references: [planType], onDelete: Restrict)
   status        TransactionStatus @default(PENDING)
   paymentMethod String?
 

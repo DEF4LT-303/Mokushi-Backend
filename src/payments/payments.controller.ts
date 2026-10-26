@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   Res,
@@ -16,13 +17,14 @@ import {
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
+  ApiParam,
   ApiQuery,
   ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import { SkipThrottle, Throttle } from "@nestjs/throttler";
-import { PlanType, Role, TransactionStatus } from "@prisma/client";
+import { PlanCategory, PlanType, Role, TransactionStatus } from "@prisma/client";
 import { Response } from "express";
 import { CurrentUser } from "src/auth/decorators/current-user.decorator";
 import { Roles } from "src/auth/decorators/roles.decorator";
@@ -31,6 +33,8 @@ import { RolesGuard } from "src/auth/guards/roles.guard";
 import { AdminInvalidatePurchaseDto } from "./dto/admin-invalidate-purchase.dto";
 import { AdminValidatePurchaseDto } from "./dto/admin-validate-purchase.dto";
 import { InitiatePaymentDto } from "./dto/initiate-payment.dto";
+import { QueryPlansDto } from "./dto/query-plans.dto";
+import { UpdatePaymentPlanDto } from "./dto/update-payment-plan.dto";
 import { PaymentsService } from "./payments.service";
 
 @ApiTags("Payments")
@@ -40,12 +44,34 @@ export class PaymentsController {
 
   @Get("plans")
   @ApiOperation({ summary: "Get all available purchase plans and pricing" })
+  @ApiQuery({
+    name: "category",
+    required: false,
+    enum: PlanCategory,
+    description: "Filter plans by category (CORE_MODULE, RAPID_FIRE, BUNDLE)",
+  })
   @ApiResponse({
     status: 200,
     description: "List of plans returned successfully",
   })
-  getPlans() {
-    return this.paymentsService.getAvailablePlans();
+  async getPlans(@Query() query: QueryPlansDto) {
+    return this.paymentsService.getAvailablePlans(query.category);
+  }
+
+  @Get("plans/:planType")
+  @ApiOperation({ summary: "Get details of a specific plan" })
+  @ApiParam({
+    name: "planType",
+    enum: PlanType,
+    description: "The plan type identifier",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Plan returned successfully",
+  })
+  @ApiNotFoundResponse({ description: "Plan not found" })
+  async getPlanByType(@Param("planType") planType: PlanType) {
+    return this.paymentsService.getPlanByType(planType);
   }
 
   @Post("initiate")
@@ -388,5 +414,40 @@ export class PaymentsController {
   @ApiForbiddenResponse({ description: "Forbidden - Admin access required" })
   async adminTriggerReconcile() {
     return this.paymentsService.reconcilePendingTransactions();
+  }
+
+  @Get("admin/plans")
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Admin: View all payment plans including inactive ones",
+  })
+  @ApiOkResponse({ description: "All plans returned successfully" })
+  @ApiUnauthorizedResponse({ description: "Unauthorized" })
+  @ApiForbiddenResponse({ description: "Forbidden - Admin access required" })
+  async adminGetAllPlans() {
+    return this.paymentsService.adminGetAllPlans();
+  }
+
+  @Patch("admin/plans/:planType")
+  @UseGuards(JwtGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Admin: Update a payment plan" })
+  @ApiParam({
+    name: "planType",
+    enum: PlanType,
+    description: "The plan type identifier",
+  })
+  @ApiOkResponse({ description: "Plan updated successfully" })
+  @ApiNotFoundResponse({ description: "Plan not found" })
+  @ApiUnauthorizedResponse({ description: "Unauthorized" })
+  @ApiForbiddenResponse({ description: "Forbidden - Admin access required" })
+  async adminUpdatePlan(
+    @Param("planType") planType: PlanType,
+    @Body() dto: UpdatePaymentPlanDto,
+  ) {
+    return this.paymentsService.adminUpdatePlan(planType, dto);
   }
 }

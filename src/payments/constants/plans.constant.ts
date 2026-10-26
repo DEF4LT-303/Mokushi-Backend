@@ -1,17 +1,20 @@
-import { PlanType } from "@prisma/client";
+import { PlanCategory, PlanType } from "@prisma/client";
 
 export interface PlanConfig {
   planType: PlanType;
+  category: PlanCategory;
   title: string;
   description: string;
   price: number; // in BDT
   currency: string;
   features: string[];
+  isActive: boolean;
 }
 
 export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
   [PlanType.N5]: {
     planType: PlanType.N5,
+    category: PlanCategory.CORE_MODULE,
     title: "JLPT N5",
     description:
       "Unlock all premium JLPT N5 modules, lessons, and quizzes permanently.",
@@ -23,9 +26,11 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
       "Grammar rule explanations and examples",
       "Lifetime access",
     ],
+    isActive: true,
   },
   [PlanType.N4]: {
     planType: PlanType.N4,
+    category: PlanCategory.CORE_MODULE,
     title: "JLPT N4",
     description:
       "Unlock all premium JLPT N4 modules, lessons, and quizzes permanently.",
@@ -37,9 +42,11 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
       "Comprehensive grammar and sentence structures",
       "Lifetime access",
     ],
+    isActive: true,
   },
   [PlanType.RAPID_FIRE_N5]: {
     planType: PlanType.RAPID_FIRE_N5,
+    category: PlanCategory.RAPID_FIRE,
     title: "Rapid Fire N5",
     description:
       "Unlock all premium JLPT N5 rapid-fire vocabulary drill lessons permanently.",
@@ -51,9 +58,11 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
       "Hard words tracking and bookmarking",
       "Lifetime access",
     ],
+    isActive: true,
   },
   [PlanType.RAPID_FIRE_N4]: {
     planType: PlanType.RAPID_FIRE_N4,
+    category: PlanCategory.RAPID_FIRE,
     title: "Rapid Fire N4",
     description:
       "Unlock all premium JLPT N4 rapid-fire vocabulary drill lessons permanently.",
@@ -65,9 +74,11 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
       "Hard words tracking and bookmarking",
       "Lifetime access",
     ],
+    isActive: true,
   },
   [PlanType.N5_N4_BUNDLE]: {
     planType: PlanType.N5_N4_BUNDLE,
+    category: PlanCategory.BUNDLE,
     title: "JLPT N5 + N4 Bundle",
     description:
       "Unlock all premium JLPT N5 and N4 modules, lessons, and quizzes (without rapid-fire).",
@@ -79,9 +90,11 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
       "Comprehensive grammar rules and practice tests",
       "Lifetime access",
     ],
+    isActive: true,
   },
   [PlanType.N5_RAPID_FIRE_BUNDLE]: {
     planType: PlanType.N5_RAPID_FIRE_BUNDLE,
+    category: PlanCategory.BUNDLE,
     title: "JLPT N5 + Rapid Fire Bundle",
     description:
       "Unlock all premium JLPT N5 modules, quizzes, and JLPT N5 rapid-fire drills.",
@@ -93,9 +106,11 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
       "Grammar rules, practice tests, and speed drills",
       "Lifetime access",
     ],
+    isActive: true,
   },
   [PlanType.N4_RAPID_FIRE_BUNDLE]: {
     planType: PlanType.N4_RAPID_FIRE_BUNDLE,
+    category: PlanCategory.BUNDLE,
     title: "JLPT N4 + Rapid Fire Bundle",
     description:
       "Unlock all premium JLPT N4 modules, quizzes, and JLPT N4 rapid-fire drills.",
@@ -107,5 +122,6 @@ export const PLAN_CONFIGS: Record<PlanType, PlanConfig> = {
       "Comprehensive N4 grammar, quizzes, and speed drills",
       "Lifetime access",
     ],
+    isActive: true,
   },
 };

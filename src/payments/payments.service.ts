@@ -6,12 +6,18 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import { PlanType, Transaction, TransactionStatus } from "@prisma/client";
+import {
+  PlanCategory,
+  PlanType,
+  Transaction,
+  TransactionStatus,
+} from "@prisma/client";
 import { DatabaseService } from "src/database/database.service";
 import { PLAN_CONFIGS, PlanConfig } from "./constants/plans.constant";
 import { AdminInvalidatePurchaseDto } from "./dto/admin-invalidate-purchase.dto";
 import { AdminValidatePurchaseDto } from "./dto/admin-validate-purchase.dto";
 import { InitiatePaymentDto } from "./dto/initiate-payment.dto";
+import { UpdatePaymentPlanDto } from "./dto/update-payment-plan.dto";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const SSLCommerzPayment = require("sslcommerz-lts");
@@ -38,8 +44,79 @@ export class PaymentsService {
     );
   }
 
-  getAvailablePlans(): PlanConfig[] {
-    return Object.values(PLAN_CONFIGS);
+  async getAvailablePlans(category?: PlanCategory) {
+    const where: any = { isActive: true };
+    if (category) {
+      where.category = category;
+    }
+
+    const plans = await this.databaseService.paymentPlan.findMany({
+      where,
+      orderBy: [{ category: "asc" }, { price: "asc" }],
+    });
+
+    if (plans.length === 0 && !category) {
+      await this.seedDefaultPlans();
+      return this.databaseService.paymentPlan.findMany({
+        where: { isActive: true },
+        orderBy: [{ category: "asc" }, { price: "asc" }],
+      });
+    }
+
+    return plans;
+  }
+
+  async getPlanByType(planType: PlanType) {
+    let plan = await this.databaseService.paymentPlan.findUnique({
+      where: { planType },
+    });
+
+    if (!plan) {
+      const count = await this.databaseService.paymentPlan.count();
+      if (count === 0) {
+        await this.seedDefaultPlans();
+        plan = await this.databaseService.paymentPlan.findUnique({
+          where: { planType },
+        });
+      }
+    }
+
+    if (!plan) {
+      throw new NotFoundException(`Plan '${planType}' not found`);
+    }
+
+    return plan;
+  }
+
+  private async seedDefaultPlans() {
+    try {
+      for (const plan of Object.values(PLAN_CONFIGS)) {
+        await this.databaseService.paymentPlan.upsert({
+          where: { planType: plan.planType },
+          update: {
+            category: plan.category,
+            title: plan.title,
+            description: plan.description,
+            price: plan.price,
+            currency: plan.currency,
+            features: plan.features,
+            isActive: true,
+          },
+          create: {
+            planType: plan.planType,
+            category: plan.category,
+            title: plan.title,
+            description: plan.description,
+            price: plan.price,
+            currency: plan.currency,
+            features: plan.features,
+            isActive: true,
+          },
+        });
+      }
+    } catch (error) {
+      this.logger.warn(`Could not auto-seed payment plans: ${error.message}`);
+    }
   }
 
   async initiatePayment(userId: string, dto: InitiatePaymentDto) {
@@ -52,9 +129,22 @@ export class PaymentsService {
       throw new NotFoundException("User not found");
     }
 
-    const planConfig = PLAN_CONFIGS[dto.planType];
-    if (!planConfig) {
-      throw new BadRequestException("Invalid plan selected");
+    let plan = await this.databaseService.paymentPlan.findUnique({
+      where: { planType: dto.planType },
+    });
+
+    if (!plan) {
+      const count = await this.databaseService.paymentPlan.count();
+      if (count === 0) {
+        await this.seedDefaultPlans();
+        plan = await this.databaseService.paymentPlan.findUnique({
+          where: { planType: dto.planType },
+        });
+      }
+    }
+
+    if (!plan || !plan.isActive) {
+      throw new BadRequestException("Invalid or inactive plan selected");
     }
 
     const alreadyPurchased = user.purchases.some(
@@ -62,7 +152,7 @@ export class PaymentsService {
     );
     if (alreadyPurchased) {
       throw new BadRequestException(
-        `You have already purchased the ${planConfig.title}.`,
+        `You have already purchased the ${plan.title}.`,
       );
     }
 
@@ -101,8 +191,8 @@ export class PaymentsService {
       data: {
         userId,
         tranId,
-        amount: planConfig.price,
-        currency: planConfig.currency,
+        amount: plan.price,
+        currency: plan.currency,
         planToBuy: dto.planType,
         status: TransactionStatus.PENDING,
       },
@@ -111,15 +201,15 @@ export class PaymentsService {
     const backendUrl = process.env.BACKEND_URL || "http://localhost:3000";
 
     const paymentData = {
-      total_amount: planConfig.price,
-      currency: planConfig.currency,
+      total_amount: plan.price,
+      currency: plan.currency,
       tran_id: tranId,
       success_url: `${backendUrl}/api/payments/success`,
       fail_url: `${backendUrl}/api/payments/fail`,
       cancel_url: `${backendUrl}/api/payments/cancel`,
       ipn_url: `${backendUrl}/api/payments/ipn`,
       shipping_method: "NO",
-      product_name: planConfig.title,
+      product_name: plan.title,
       product_category: "Education",
       product_profile: "non-physical-goods",
       cus_name:
@@ -140,7 +230,7 @@ export class PaymentsService {
         return {
           gatewayUrl: response.GatewayPageURL,
           tranId,
-          plan: planConfig,
+          plan,
         };
       }
 
@@ -360,6 +450,9 @@ export class PaymentsService {
     return this.databaseService.userPurchase.findMany({
       where: { userId },
       orderBy: { purchasedAt: "desc" },
+      include: {
+        plan: true,
+      },
     });
   }
 
@@ -507,7 +600,9 @@ export class PaymentsService {
       throw new NotFoundException("User not found");
     }
 
-    const planConfig = PLAN_CONFIGS[dto.planType];
+    const plan = await this.databaseService.paymentPlan.findUnique({
+      where: { planType: dto.planType },
+    });
     const auditNote = dto.reason
       ? `ADMIN_MANUAL: ${dto.reason}`
       : "ADMIN_MANUAL";
@@ -549,8 +644,8 @@ export class PaymentsService {
               userId: dto.userId,
               tranId: adminTranId,
               valId: "ADMIN_VALIDATED",
-              amount: planConfig?.price || 0,
-              currency: planConfig?.currency || "BDT",
+              amount: plan?.price || 0,
+              currency: plan?.currency || "BDT",
               planToBuy: dto.planType,
               status: TransactionStatus.SUCCESS,
               paymentMethod: auditNote,
@@ -580,7 +675,7 @@ export class PaymentsService {
             details: {
               planType: dto.planType,
               tranId: updatedOrCreatedTx.tranId,
-              amount: planConfig?.price || 0,
+              amount: plan?.price || 0,
               reason: dto.reason || "Manual validation by admin",
             },
           },
@@ -599,6 +694,34 @@ export class PaymentsService {
       purchase,
       transaction,
     };
+  }
+
+  async adminGetAllPlans() {
+    return this.databaseService.paymentPlan.findMany({
+      orderBy: [{ category: "asc" }, { price: "asc" }],
+    });
+  }
+
+  async adminUpdatePlan(planType: PlanType, dto: UpdatePaymentPlanDto) {
+    const plan = await this.databaseService.paymentPlan.findUnique({
+      where: { planType },
+    });
+    if (!plan) {
+      throw new NotFoundException(`Plan '${planType}' not found`);
+    }
+
+    return this.databaseService.paymentPlan.update({
+      where: { planType },
+      data: {
+        ...(dto.title !== undefined && { title: dto.title }),
+        ...(dto.description !== undefined && { description: dto.description }),
+        ...(dto.price !== undefined && { price: dto.price }),
+        ...(dto.currency !== undefined && { currency: dto.currency }),
+        ...(dto.category !== undefined && { category: dto.category }),
+        ...(dto.features !== undefined && { features: dto.features }),
+        ...(dto.isActive !== undefined && { isActive: dto.isActive }),
+      },
+    });
   }
 
   async adminInvalidatePurchase(
