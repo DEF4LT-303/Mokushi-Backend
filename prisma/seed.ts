@@ -1,5 +1,5 @@
 import { faker } from '@faker-js/faker';
-import { CategoryType, JlptLevel, PlanCategory, PlanType, PrismaClient, QuestionType, Role } from '@prisma/client';
+import { CategoryType, JlptLevel, PlanCategory, PlanType, PrismaClient, QuestionType, Role, UserAttemptStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
@@ -783,7 +783,7 @@ async function createSampleAttempts(users: any[], quizzes: any[]) {
         userId: user.id,
         quizId: quiz.id,
         score: 0,
-        completed: true,
+        status: UserAttemptStatus.COMPLETED,
         startedAt: new Date(),
         submittedAt: new Date(),
       },
