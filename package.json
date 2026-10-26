@@ -21,6 +21,7 @@
     "db:seed": "ts-node prisma/seed.ts",
     "seed": "ts-node prisma/seed.ts",
     "seed:all": "ts-node prisma/seed.ts all",
+    "seed:plans": "ts-node prisma/seed.ts plans",
     "seed:rules": "ts-node prisma/seed.ts rules",
     "seed:rule-models": "ts-node prisma/seed.ts rule-models",
     "seed:users": "ts-node prisma/seed.ts users",

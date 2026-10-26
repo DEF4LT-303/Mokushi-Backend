@@ -1,6 +1,6 @@
 import { BadRequestException, NotFoundException } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
-import { PlanType, TransactionStatus } from "@prisma/client";
+import { PlanCategory, PlanType, TransactionStatus } from "@prisma/client";
 import { DatabaseService } from "src/database/database.service";
 import { PLAN_CONFIGS } from "./constants/plans.constant";
 import { PaymentsService } from "./payments.service";
@@ -13,6 +13,14 @@ describe("PaymentsService", () => {
     mockDatabaseService = {
       user: {
         findUnique: jest.fn(),
+      },
+      paymentPlan: {
+        findMany: jest.fn(),
+        findUnique: jest.fn(),
+        create: jest.fn(),
+        update: jest.fn(),
+        upsert: jest.fn(),
+        count: jest.fn(),
       },
       transaction: {
         create: jest.fn(),
@@ -61,10 +69,52 @@ describe("PaymentsService", () => {
   });
 
   describe("getAvailablePlans", () => {
-    it("should return all configured plans", () => {
-      const plans = service.getAvailablePlans();
-      expect(plans.length).toBe(Object.keys(PLAN_CONFIGS).length);
+    it("should return all configured plans from database", async () => {
+      const mockPlans = Object.values(PLAN_CONFIGS);
+      mockDatabaseService.paymentPlan.findMany.mockResolvedValue(mockPlans);
+
+      const plans = await service.getAvailablePlans();
+      expect(plans.length).toBe(mockPlans.length);
       expect(plans.map((p) => p.planType)).toContain(PlanType.N5);
+      expect(mockDatabaseService.paymentPlan.findMany).toHaveBeenCalledWith({
+        where: { isActive: true },
+        orderBy: [{ category: "asc" }, { price: "asc" }],
+      });
+    });
+
+    it("should filter plans by category when provided", async () => {
+      const corePlans = Object.values(PLAN_CONFIGS).filter(
+        (p) => p.category === PlanCategory.CORE_MODULE,
+      );
+      mockDatabaseService.paymentPlan.findMany.mockResolvedValue(corePlans);
+
+      const plans = await service.getAvailablePlans(PlanCategory.CORE_MODULE);
+      expect(plans.length).toBe(corePlans.length);
+      expect(mockDatabaseService.paymentPlan.findMany).toHaveBeenCalledWith({
+        where: { isActive: true, category: PlanCategory.CORE_MODULE },
+        orderBy: [{ category: "asc" }, { price: "asc" }],
+      });
+    });
+  });
+
+  describe("getPlanByType", () => {
+    it("should return plan if found", async () => {
+      mockDatabaseService.paymentPlan.findUnique.mockResolvedValue(
+        PLAN_CONFIGS[PlanType.N5],
+      );
+
+      const plan = await service.getPlanByType(PlanType.N5);
+      expect(plan.planType).toBe(PlanType.N5);
+      expect(plan.category).toBe(PlanCategory.CORE_MODULE);
+    });
+
+    it("should throw NotFoundException if plan not found and count > 0", async () => {
+      mockDatabaseService.paymentPlan.findUnique.mockResolvedValue(null);
+      mockDatabaseService.paymentPlan.count.mockResolvedValue(7);
+
+      await expect(service.getPlanByType(PlanType.N5)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 
@@ -79,11 +129,29 @@ describe("PaymentsService", () => {
       ).rejects.toThrow(NotFoundException);
     });
 
+    it("should throw BadRequestException if plan is not found or inactive", async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue({
+        id: "user-1",
+        purchases: [],
+      });
+      mockDatabaseService.paymentPlan.findUnique.mockResolvedValue(null);
+      mockDatabaseService.paymentPlan.count.mockResolvedValue(7);
+
+      await expect(
+        service.initiatePayment("user-1", {
+          planType: PlanType.N5,
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it("should throw BadRequestException if user already has superset bundle", async () => {
       mockDatabaseService.user.findUnique.mockResolvedValue({
         id: "user-1",
         purchases: [{ planType: PlanType.N5_N4_BUNDLE }],
       });
+      mockDatabaseService.paymentPlan.findUnique.mockResolvedValue(
+        PLAN_CONFIGS[PlanType.N5],
+      );
 
       await expect(
         service.initiatePayment("user-1", {
@@ -97,6 +165,9 @@ describe("PaymentsService", () => {
         id: "user-1",
         purchases: [{ planType: PlanType.N5 }],
       });
+      mockDatabaseService.paymentPlan.findUnique.mockResolvedValue(
+        PLAN_CONFIGS[PlanType.N5],
+      );
 
       await expect(
         service.initiatePayment("user-1", {
@@ -112,6 +183,9 @@ describe("PaymentsService", () => {
         fullName: "Test Learner",
         purchases: [],
       });
+      mockDatabaseService.paymentPlan.findUnique.mockResolvedValue(
+        PLAN_CONFIGS[PlanType.N5],
+      );
       mockDatabaseService.transaction.create.mockResolvedValue({});
 
       // Mock sslcommerz.init
@@ -573,6 +647,9 @@ describe("PaymentsService", () => {
 
     it("should manually validate and fulfill purchase with existing tranId", async () => {
       mockDatabaseService.user.findUnique.mockResolvedValue({ id: "user-1" });
+      mockDatabaseService.paymentPlan.findUnique.mockResolvedValue(
+        PLAN_CONFIGS[PlanType.N5],
+      );
       mockDatabaseService.transaction.findUnique.mockResolvedValue({
         tranId: "MK_PENDING",
         userId: "user-1",
@@ -630,6 +707,9 @@ describe("PaymentsService", () => {
 
     it("should create audit transaction and grant plan if tranId is not provided", async () => {
       mockDatabaseService.user.findUnique.mockResolvedValue({ id: "user-1" });
+      mockDatabaseService.paymentPlan.findUnique.mockResolvedValue(
+        PLAN_CONFIGS[PlanType.N5_N4_BUNDLE],
+      );
       mockDatabaseService.transaction.create.mockResolvedValue({
         tranId: "ADMIN_GRANT_123",
         status: TransactionStatus.SUCCESS,
@@ -935,6 +1015,65 @@ describe("PaymentsService", () => {
       expect(url).toBe(
         "http://localhost:5173/payment-status?status=success&tran_id=MK_LOCAL",
       );
+    });
+  });
+
+  describe("getUserPurchases", () => {
+    it("should return user purchases including plan", async () => {
+      mockDatabaseService.userPurchase.findMany.mockResolvedValue([
+        { planType: PlanType.N5, plan: PLAN_CONFIGS[PlanType.N5] },
+      ]);
+
+      const purchases = await service.getUserPurchases("user-1");
+      expect(purchases.length).toBe(1);
+      expect(mockDatabaseService.userPurchase.findMany).toHaveBeenCalledWith({
+        where: { userId: "user-1" },
+        orderBy: { purchasedAt: "desc" },
+        include: { plan: true },
+      });
+    });
+  });
+
+  describe("adminGetAllPlans", () => {
+    it("should return all plans ordered by category and price", async () => {
+      mockDatabaseService.paymentPlan.findMany.mockResolvedValue(
+        Object.values(PLAN_CONFIGS),
+      );
+
+      const plans = await service.adminGetAllPlans();
+      expect(plans.length).toBe(7);
+      expect(mockDatabaseService.paymentPlan.findMany).toHaveBeenCalledWith({
+        orderBy: [{ category: "asc" }, { price: "asc" }],
+      });
+    });
+  });
+
+  describe("adminUpdatePlan", () => {
+    it("should throw NotFoundException if plan does not exist", async () => {
+      mockDatabaseService.paymentPlan.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.adminUpdatePlan(PlanType.N5, { price: 599 }),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should update and return the updated plan", async () => {
+      mockDatabaseService.paymentPlan.findUnique.mockResolvedValue(
+        PLAN_CONFIGS[PlanType.N5],
+      );
+      mockDatabaseService.paymentPlan.update.mockResolvedValue({
+        ...PLAN_CONFIGS[PlanType.N5],
+        price: 599,
+      });
+
+      const updated = await service.adminUpdatePlan(PlanType.N5, {
+        price: 599,
+      });
+      expect(updated.price).toBe(599);
+      expect(mockDatabaseService.paymentPlan.update).toHaveBeenCalledWith({
+        where: { planType: PlanType.N5 },
+        data: { price: 599 },
+      });
     });
   });
 });

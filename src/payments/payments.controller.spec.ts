@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { PlanType } from "@prisma/client";
+import { PlanCategory, PlanType } from "@prisma/client";
 import { PaymentsController } from "./payments.controller";
 import { PaymentsService } from "./payments.service";
 
@@ -10,6 +10,7 @@ describe("PaymentsController", () => {
   beforeEach(async () => {
     mockPaymentsService = {
       getAvailablePlans: jest.fn().mockReturnValue([]),
+      getPlanByType: jest.fn().mockResolvedValue({ planType: PlanType.N5 }),
       initiatePayment: jest.fn().mockResolvedValue({
         gatewayUrl: "https://sandbox.sslcommerz.com/gwprocess/v4/test",
         tranId: "MK_123",
@@ -19,6 +20,8 @@ describe("PaymentsController", () => {
       handlePaymentCancel: jest.fn().mockResolvedValue(undefined),
       getUserPurchases: jest.fn().mockResolvedValue([]),
       getUserTransactions: jest.fn().mockResolvedValue([]),
+      adminGetAllPlans: jest.fn().mockResolvedValue([]),
+      adminUpdatePlan: jest.fn().mockResolvedValue({ planType: PlanType.N5 }),
       adminGetSubscriptions: jest
         .fn()
         .mockResolvedValue({ total: 1, count: 1, subscriptions: [] }),
@@ -74,9 +77,28 @@ describe("PaymentsController", () => {
   });
 
   describe("getPlans", () => {
-    it("should return plans from service", () => {
-      controller.getPlans();
-      expect(mockPaymentsService.getAvailablePlans).toHaveBeenCalled();
+    it("should return plans from service without category filter", async () => {
+      await controller.getPlans({});
+      expect(mockPaymentsService.getAvailablePlans).toHaveBeenCalledWith(
+        undefined,
+      );
+    });
+
+    it("should return plans filtered by category", async () => {
+      await controller.getPlans({ category: PlanCategory.CORE_MODULE });
+      expect(mockPaymentsService.getAvailablePlans).toHaveBeenCalledWith(
+        PlanCategory.CORE_MODULE,
+      );
+    });
+  });
+
+  describe("getPlanByType", () => {
+    it("should return plan details by planType", async () => {
+      const result = await controller.getPlanByType(PlanType.N5);
+      expect(mockPaymentsService.getPlanByType).toHaveBeenCalledWith(
+        PlanType.N5,
+      );
+      expect(result).toEqual({ planType: PlanType.N5 });
     });
   });
 
@@ -311,6 +333,22 @@ describe("PaymentsController", () => {
         mockPaymentsService.reconcilePendingTransactions,
       ).toHaveBeenCalled();
       expect(result.fulfilled).toBe(1);
+    });
+
+    it("should call adminGetAllPlans", async () => {
+      const result = await controller.adminGetAllPlans();
+      expect(mockPaymentsService.adminGetAllPlans).toHaveBeenCalled();
+      expect(result).toEqual([]);
+    });
+
+    it("should call adminUpdatePlan with planType and dto", async () => {
+      const dto = { price: 599 };
+      const result = await controller.adminUpdatePlan(PlanType.N5, dto);
+      expect(mockPaymentsService.adminUpdatePlan).toHaveBeenCalledWith(
+        PlanType.N5,
+        dto,
+      );
+      expect(result).toEqual({ planType: PlanType.N5 });
     });
   });
 });
