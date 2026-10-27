@@ -1,6 +1,8 @@
 import { faker } from '@faker-js/faker';
 import { CategoryType, JlptLevel, PlanCategory, PlanType, PrismaClient, QuestionType, Role, UserAttemptStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import * as fs from 'fs';
+import * as path from 'path';
 
 const prisma = new PrismaClient();
 
@@ -106,14 +108,20 @@ async function main() {
   }
 
   if (shouldRun('rapid-fire') || shouldRun('rapidfire')) {
-    const seedTitles = ['Rapid Fire N5 Vocabulary', 'Rapid Fire N5 Kanji'];
-    // Remove previous seed overall stats (cascades to lesson stats & words)
+    // Remove previous seed user hard words & overall stats
+    await prisma.hardWord.deleteMany({ where: { user: { email: { contains: 'seed+' } } } });
     await prisma.rapidFireOverallStat.deleteMany({ where: { user: { email: { contains: 'seed+' } } } });
 
-    // Build seed data and create overall stats with nested lesson stats + words
+    // Build seed data from English lesson files
     rapidFireLessons = await createRapidFireLessons();
-    if (users.length && rapidFireLessons.length) {
-      rapidFireOverallStats = await createRapidFireStats(users, rapidFireLessons);
+
+    // Use users created in this run or fetch existing seed users
+    const usersForStats = users.length
+      ? users
+      : await prisma.user.findMany({ where: { email: { contains: 'seed+' } }, take: 5 });
+
+    if (usersForStats.length && rapidFireLessons.length) {
+      rapidFireOverallStats = await createRapidFireStats(usersForStats, rapidFireLessons);
       console.log(`📊 Created ${rapidFireOverallStats.length} sample rapid-fire stats`);
     }
   }
@@ -670,51 +678,117 @@ function generateExplanation(questionType: QuestionType) {
 }
 
 
-// Create sample user attempts and user answers for the first quiz
-async function createRapidFireLessons() {
-  const rapidFireLessons: any[] = [];
+interface EnglishLessonWord {
+  word: string;
+  reading: string;
+  romaji: string;
+  meaning: string;
+  lesson: number;
+}
 
-  const lessonSeedData = [
-    {
-      title: 'Rapid Fire N5 Vocabulary',
-      lessonNumber: 1,
-      jlptLevel: JlptLevel.N5,
-      words: [
-        { word: 'たべもの', reading: 'たべもの', romaji: 'tabemono', meaning: 'food' },
-        { word: 'のみもの', reading: 'のみもの', romaji: 'nomimono', meaning: 'drink' },
-        { word: 'いえ', reading: 'いえ', romaji: 'ie', meaning: 'house' },
-        { word: 'ともだち', reading: 'ともだち', romaji: 'tomodachi', meaning: 'friend' },
-        { word: 'がっこう', reading: 'がっこう', romaji: 'gakkou', meaning: 'school' },
-      ],
-    },
-    {
-      title: 'Rapid Fire N5 Kanji',
-      lessonNumber: 2,
-      jlptLevel: JlptLevel.N5,
-      words: [
-        { word: '人', reading: 'ひと', romaji: 'hito', meaning: 'person' },
-        { word: '大', reading: 'だい', romaji: 'dai', meaning: 'big' },
-        { word: '小', reading: 'しょう', romaji: 'shou', meaning: 'small' },
-        { word: '山', reading: 'やま', romaji: 'yama', meaning: 'mountain' },
-        { word: '川', reading: 'かわ', romaji: 'kawa', meaning: 'river' },
-      ],
-    },
+function getEnglishDataDir(): string {
+  const candidatePaths = [
+    path.resolve(__dirname, '../../English'),
+    path.resolve(__dirname, '../English'),
+    path.resolve(process.cwd(), '../English'),
+    path.resolve(process.cwd(), 'English'),
+    path.resolve(process.cwd(), '../..', 'English'),
   ];
 
-  for (const seed of lessonSeedData) {
-    const rapidFireLesson = await prisma.rapidFireLesson.create({
-      data: {
-        title: seed.title,
-        lessonNumber: seed.lessonNumber,
-        jlptLevel: seed.jlptLevel,
-        words: { create: seed.words },
-      },
-      include: { words: true },
-    });
-    rapidFireLessons.push(rapidFireLesson);
+  for (const candidate of candidatePaths) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
   }
 
-  return rapidFireLessons;
+  throw new Error(
+    `English lessons folder not found. Searched paths:\n${candidatePaths.join('\n')}`,
+  );
+}
+
+// Create rapid-fire lessons and word bank from English/lesson*.json files
+async function createRapidFireLessons() {
+  const englishDir = getEnglishDataDir();
+  console.log(`📂 Reading English lesson data from: ${englishDir}`);
+
+  const files = fs
+    .readdirSync(englishDir)
+    .filter((file) => /^lesson\d+\.json$/i.test(file));
+
+  // Sort files numerically by lesson number
+  files.sort((a, b) => {
+    const numA = parseInt(a.replace(/\D/g, ''), 10);
+    const numB = parseInt(b.replace(/\D/g, ''), 10);
+    return numA - numB;
+  });
+
+  const createdLessons: any[] = [];
+  let totalWordsCount = 0;
+
+  for (const file of files) {
+    const filePath = path.join(englishDir, file);
+    const fileContent = fs.readFileSync(filePath, 'utf-8');
+    const rawWords: EnglishLessonWord[] = JSON.parse(fileContent);
+
+    if (!rawWords.length) {
+      continue;
+    }
+
+    const lessonNumber = rawWords[0].lesson;
+    const isPremium = lessonNumber > 5; // Free: lessons 1-5; Premium: lessons 6-25
+    const title = `Lesson ${lessonNumber}: Vocabulary`;
+
+    // Upsert the lesson record
+    const rapidFireLesson = await prisma.rapidFireLesson.upsert({
+      where: {
+        jlptLevel_lessonNumber: {
+          jlptLevel: JlptLevel.N5,
+          lessonNumber,
+        },
+      },
+      update: {
+        title,
+        isPremium,
+      },
+      create: {
+        title,
+        lessonNumber,
+        jlptLevel: JlptLevel.N5,
+        isPremium,
+      },
+    });
+
+    // Clean up existing words for this lesson before seeding fresh words
+    await prisma.rapidFireWord.deleteMany({
+      where: { rapidFireLessonId: rapidFireLesson.id },
+    });
+
+    // Batch insert vocabulary words
+    await prisma.rapidFireWord.createMany({
+      data: rawWords.map((item) => ({
+        word: item.word.trim(),
+        reading: item.reading.trim(),
+        romaji: item.romaji.trim(),
+        meaning: item.meaning.trim(),
+        rapidFireLessonId: rapidFireLesson.id,
+      })),
+    });
+
+    const fullLesson = await prisma.rapidFireLesson.findUnique({
+      where: { id: rapidFireLesson.id },
+      include: { words: true },
+    });
+
+    if (fullLesson) {
+      createdLessons.push(fullLesson);
+      totalWordsCount += fullLesson.words.length;
+    }
+  }
+
+  console.log(
+    `⚡ Seeded ${createdLessons.length} rapid-fire lessons with ${totalWordsCount} vocabulary words`,
+  );
+  return createdLessons;
 }
 
 async function createRapidFireStats(users: any[], rapidFireLessons: any[]) {
@@ -723,14 +797,23 @@ async function createRapidFireStats(users: any[], rapidFireLessons: any[]) {
 
   const seedUser = users.find((u: any) => u.email?.includes('seed+')) || users[0];
   if (!seedUser) return overallStats;
-  // Create one overall stat for the seed user and nested lesson stats that reference the static lessons
+
+  // Clean up any existing overall stat and hard words for this seed user and level
+  await prisma.hardWord.deleteMany({
+    where: { userId: seedUser.id },
+  });
+  await prisma.rapidFireOverallStat.deleteMany({
+    where: { userId: seedUser.id, jlptLevel: JlptLevel.N5 },
+  });
+
+  const firstLesson = rapidFireLessons[0];
   const overallStat = await prisma.rapidFireOverallStat.create({
     data: {
       userId: seedUser.id,
-      jlptLevel: rapidFireLessons[0].jlptLevel,
+      jlptLevel: JlptLevel.N5,
       masteryRate: 80,
       totalHardWords: 2,
-      totalLessons: 25,
+      totalLessons: rapidFireLessons.length,
       totalAnswers: 10,
       totalCorrect: 8,
       lessonStats: {
@@ -739,24 +822,28 @@ async function createRapidFireStats(users: any[], rapidFireLessons: any[]) {
           userId: seedUser.id,
           lessonNumber: lesson.lessonNumber,
           totalWords: lesson.words.length,
-          masteryRate: 80,
-          totalAnswers: 10,
-          totalCorrect: 8,
-          lastPracticed: new Date(),
+          masteryRate: lesson.lessonNumber === 1 ? 80 : 0,
+          totalAnswers: lesson.lessonNumber === 1 ? 10 : 0,
+          totalCorrect: lesson.lessonNumber === 1 ? 8 : 0,
+          lastPracticed: lesson.lessonNumber === 1 ? new Date() : null,
         })),
       },
       lessonsPracticed: {
-        connect: [{ id: rapidFireLessons[0].id }],
+        connect: [{ id: firstLesson.id }],
       },
     },
     include: { lessonStats: true },
   });
 
   overallStats.push(overallStat);
+
   // create some sample HardWord entries for the seed user (mark first two words of first lesson as hard)
   try {
-    const firstLessonWords = rapidFireLessons[0]?.words || [];
-    const hardRecords = firstLessonWords.slice(0, 2).map((w: any) => ({ userId: seedUser.id, rapidFireWordId: w.id }));
+    const firstLessonWords = firstLesson?.words || [];
+    const hardRecords = firstLessonWords.slice(0, 2).map((w: any) => ({
+      userId: seedUser.id,
+      rapidFireWordId: w.id,
+    }));
     if (hardRecords.length) {
       await prisma.hardWord.createMany({ data: hardRecords });
     }

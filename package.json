@@ -29,6 +29,7 @@
     "seed:questions": "ts-node prisma/seed.ts questions",
     "seed:quizzes": "ts-node prisma/seed.ts quizzes",
     "seed:attempts": "ts-node prisma/seed.ts attempts",
+    "seed:rapid-fire": "ts-node prisma/seed.ts rapid-fire",
     "db:reset": "prisma migrate reset --force && npm run db:seed"
   },
   "dependencies": {

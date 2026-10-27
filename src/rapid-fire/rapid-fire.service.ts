@@ -10,9 +10,18 @@ import { DatabaseService } from "../database/database.service";
 import { RapidFireLessonOverviewDto } from "./dto/lesson-detail.dto";
 import { RapidFireLessonStatDto } from "./dto/lesson-stat.dto";
 import { OverallStatsDto } from "./dto/overall-stats.dto";
+import {
+  QueryRapidFireLessonsDto,
+  QueryRapidFireWordsDto,
+} from "./dto/query-rapid-fire.dto";
 import { SubmitRapidFireAnswersResponseDto } from "./dto/rapid-fire-answer-response.dto";
 import { SubmitRapidFireAnswersDto } from "./dto/rapid-fire-answer.dto";
-import { RapidFireWordDto } from "./dto/rapid-fire-word.dto";
+import { RapidFireLessonDto } from "./dto/rapid-fire-lesson.dto";
+import {
+  RapidFireWordDetailDto,
+  RapidFireWordDto,
+  ToggleHardWordResponseDto,
+} from "./dto/rapid-fire-word.dto";
 
 @Injectable()
 export class RapidFireService {
@@ -210,8 +219,139 @@ export class RapidFireService {
     };
   }
 
+  async checkUserLessonAccess(
+    lesson: { isPremium: boolean; jlptLevel: JlptLevel },
+    userId?: string,
+    user?: any,
+  ): Promise<boolean> {
+    if (!lesson.isPremium) {
+      return true;
+    }
+    if (!userId) {
+      return false;
+    }
+    if (user?.role === Role.ADMIN) {
+      return true;
+    }
+
+    const userPurchases =
+      user?.purchases ||
+      (await this.databaseService.userPurchase.findMany({
+        where: { userId },
+        select: { planType: true },
+      }));
+
+    return (
+      (lesson.jlptLevel === JlptLevel.N5 &&
+        userPurchases.some(
+          (p: any) =>
+            p.planType === PlanType.RAPID_FIRE_N5 ||
+            p.planType === PlanType.N5_RAPID_FIRE_BUNDLE,
+        )) ||
+      (lesson.jlptLevel === JlptLevel.N4 &&
+        userPurchases.some(
+          (p: any) =>
+            p.planType === PlanType.RAPID_FIRE_N4 ||
+            p.planType === PlanType.N4_RAPID_FIRE_BUNDLE,
+        ))
+    );
+  }
+
+  async getAllLessons(
+    query?: QueryRapidFireLessonsDto,
+    userId?: string,
+    user?: any,
+  ): Promise<RapidFireLessonDto[]> {
+    const where: any = {};
+    if (query?.jlptLevel) {
+      where.jlptLevel = query.jlptLevel;
+    }
+    if (query?.isPremium !== undefined) {
+      where.isPremium = query.isPremium;
+    }
+
+    const lessons = await this.databaseService.rapidFireLesson.findMany({
+      where,
+      orderBy: [{ jlptLevel: "asc" }, { lessonNumber: "asc" }],
+      include: {
+        _count: { select: { words: true } },
+      },
+    });
+
+    let userPurchases: any[] = [];
+    if (userId && user?.role !== Role.ADMIN) {
+      userPurchases =
+        user?.purchases ||
+        (await this.databaseService.userPurchase.findMany({
+          where: { userId },
+          select: { planType: true },
+        }));
+    }
+
+    return lessons.map((lesson) => {
+      const isUnlocked =
+        !lesson.isPremium ||
+        user?.role === Role.ADMIN ||
+        (lesson.jlptLevel === JlptLevel.N5 &&
+          userPurchases.some(
+            (p: any) =>
+              p.planType === PlanType.RAPID_FIRE_N5 ||
+              p.planType === PlanType.N5_RAPID_FIRE_BUNDLE,
+          )) ||
+        (lesson.jlptLevel === JlptLevel.N4 &&
+          userPurchases.some(
+            (p: any) =>
+              p.planType === PlanType.RAPID_FIRE_N4 ||
+              p.planType === PlanType.N4_RAPID_FIRE_BUNDLE,
+          ));
+
+      return {
+        id: lesson.id,
+        title: lesson.title,
+        lessonNumber: lesson.lessonNumber,
+        jlptLevel: lesson.jlptLevel,
+        isPremium: lesson.isPremium,
+        wordCount: lesson._count.words,
+        isUnlocked: userId ? isUnlocked : !lesson.isPremium,
+      };
+    });
+  }
+
+  async getLessonById(
+    lessonId: string,
+    userId?: string,
+    user?: any,
+  ): Promise<RapidFireLessonDto> {
+    const lesson = await this.databaseService.rapidFireLesson.findUnique({
+      where: { id: lessonId },
+      include: {
+        _count: { select: { words: true } },
+      },
+    });
+
+    if (!lesson) {
+      throw new NotFoundException(
+        `Rapid-fire lesson for id '${lessonId}' not found`,
+      );
+    }
+
+    const isUnlocked = await this.checkUserLessonAccess(lesson, userId, user);
+
+    return {
+      id: lesson.id,
+      title: lesson.title,
+      lessonNumber: lesson.lessonNumber,
+      jlptLevel: lesson.jlptLevel,
+      isPremium: lesson.isPremium,
+      wordCount: lesson._count.words,
+      isUnlocked,
+    };
+  }
+
   async getRapidFireWordsForLesson(
     lessonId: string,
+    userId?: string,
+    user?: any,
   ): Promise<RapidFireWordDto[]> {
     const rapidFireLesson =
       await this.databaseService.rapidFireLesson.findUnique({
@@ -225,7 +365,388 @@ export class RapidFireService {
       );
     }
 
-    return rapidFireLesson.words.map((word: any) => this.mapWordToDto(word));
+    const hasAccess = await this.checkUserLessonAccess(
+      rapidFireLesson,
+      userId,
+      user,
+    );
+
+    if (!hasAccess) {
+      throw new ForbiddenException(
+        `Rapid-Fire lesson '${rapidFireLesson.title}' is locked. Please unlock the Rapid Fire ${rapidFireLesson.jlptLevel} plan or bundle to view words.`,
+      );
+    }
+
+    let hardIds = new Set<string>();
+    if (userId) {
+      const hardMarks = await this.databaseService.hardWord.findMany({
+        where: {
+          userId,
+          rapidFireWord: { rapidFireLessonId: lessonId },
+        },
+        select: { rapidFireWordId: true },
+      });
+      hardIds = new Set(hardMarks.map((h: any) => h.rapidFireWordId));
+    }
+
+    return rapidFireLesson.words.map((word: any) =>
+      this.mapWordToDto(word, hardIds.has(word.id)),
+    );
+  }
+
+  async getWordById(
+    wordId: string,
+    userId?: string,
+  ): Promise<RapidFireWordDetailDto> {
+    const word = await this.databaseService.rapidFireWord.findUnique({
+      where: { id: wordId },
+      include: {
+        rapidFireLesson: true,
+      },
+    });
+
+    if (!word) {
+      throw new NotFoundException(`Word with id '${wordId}' not found`);
+    }
+
+    let isHard = false;
+    if (userId) {
+      const mark = await this.databaseService.hardWord.findUnique({
+        where: {
+          userId_rapidFireWordId: {
+            userId,
+            rapidFireWordId: wordId,
+          },
+        },
+      });
+      isHard = !!mark;
+    }
+
+    return {
+      id: word.id,
+      word: word.word,
+      reading: word.reading,
+      romaji: word.romaji,
+      meaning: word.meaning,
+      rapidFireLessonId: word.rapidFireLessonId,
+      lessonTitle: word.rapidFireLesson?.title,
+      lessonNumber: word.rapidFireLesson?.lessonNumber,
+      jlptLevel: word.rapidFireLesson?.jlptLevel,
+      isPremium: word.rapidFireLesson?.isPremium,
+      isHard,
+    };
+  }
+
+  async searchWords(
+    query: QueryRapidFireWordsDto,
+    userId?: string,
+  ): Promise<{ total: number; words: RapidFireWordDetailDto[] }> {
+    const { jlptLevel, lessonNumber, search, skip = 0, take = 50 } = query;
+
+    const where: any = {};
+    if (jlptLevel || lessonNumber) {
+      where.rapidFireLesson = {};
+      if (jlptLevel) where.rapidFireLesson.jlptLevel = jlptLevel;
+      if (lessonNumber) where.rapidFireLesson.lessonNumber = lessonNumber;
+    }
+
+    if (search) {
+      where.OR = [
+        { word: { contains: search } },
+        { reading: { contains: search } },
+        { romaji: { contains: search } },
+        { meaning: { contains: search } },
+      ];
+    }
+
+    const [total, words] = await Promise.all([
+      this.databaseService.rapidFireWord.count({ where }),
+      this.databaseService.rapidFireWord.findMany({
+        where,
+        skip,
+        take,
+        orderBy: [
+          { rapidFireLesson: { lessonNumber: "asc" } },
+          { word: "asc" },
+        ],
+        include: {
+          rapidFireLesson: true,
+        },
+      }),
+    ]);
+
+    let hardIds = new Set<string>();
+    if (userId && words.length > 0) {
+      const wordIds = words.map((w: any) => w.id);
+      const marks = await this.databaseService.hardWord.findMany({
+        where: {
+          userId,
+          rapidFireWordId: { in: wordIds },
+        },
+        select: { rapidFireWordId: true },
+      });
+      hardIds = new Set(marks.map((m: any) => m.rapidFireWordId));
+    }
+
+    return {
+      total,
+      words: words.map((w: any) => ({
+        id: w.id,
+        word: w.word,
+        reading: w.reading,
+        romaji: w.romaji,
+        meaning: w.meaning,
+        rapidFireLessonId: w.rapidFireLessonId,
+        lessonTitle: w.rapidFireLesson?.title,
+        lessonNumber: w.rapidFireLesson?.lessonNumber,
+        jlptLevel: w.rapidFireLesson?.jlptLevel,
+        isPremium: w.rapidFireLesson?.isPremium,
+        isHard: hardIds.has(w.id),
+      })),
+    };
+  }
+
+  async getUserHardWords(
+    userId: string,
+    jlptLevel?: JlptLevel,
+  ): Promise<{ total: number; hardWords: RapidFireWordDetailDto[] }> {
+    const where: any = { userId };
+    if (jlptLevel) {
+      where.rapidFireWord = {
+        rapidFireLesson: { jlptLevel },
+      };
+    }
+
+    const hardMarks = await this.databaseService.hardWord.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      include: {
+        rapidFireWord: {
+          include: {
+            rapidFireLesson: true,
+          },
+        },
+      },
+    });
+
+    return {
+      total: hardMarks.length,
+      hardWords: hardMarks.map((hm: any) => {
+        const w = hm.rapidFireWord;
+        return {
+          id: w.id,
+          word: w.word,
+          reading: w.reading,
+          romaji: w.romaji,
+          meaning: w.meaning,
+          rapidFireLessonId: w.rapidFireLessonId,
+          lessonTitle: w.rapidFireLesson?.title,
+          lessonNumber: w.rapidFireLesson?.lessonNumber,
+          jlptLevel: w.rapidFireLesson?.jlptLevel,
+          isPremium: w.rapidFireLesson?.isPremium,
+          isHard: true,
+        };
+      }),
+    };
+  }
+
+  async toggleHardWord(
+    userId: string,
+    wordId: string,
+  ): Promise<ToggleHardWordResponseDto> {
+    const word = await this.databaseService.rapidFireWord.findUnique({
+      where: { id: wordId },
+      include: { rapidFireLesson: true },
+    });
+
+    if (!word) {
+      throw new NotFoundException(`Word with id '${wordId}' not found`);
+    }
+
+    const existing = await this.databaseService.hardWord.findUnique({
+      where: {
+        userId_rapidFireWordId: {
+          userId,
+          rapidFireWordId: wordId,
+        },
+      },
+    });
+
+    let isHard: boolean;
+    if (existing) {
+      await this.databaseService.hardWord.delete({
+        where: { id: existing.id },
+      });
+      isHard = false;
+    } else {
+      await this.databaseService.hardWord.create({
+        data: {
+          userId,
+          rapidFireWordId: wordId,
+        },
+      });
+      isHard = true;
+    }
+
+    const jlptLevel = word.rapidFireLesson?.jlptLevel || JlptLevel.N5;
+    const totalHardCount = await this.databaseService.hardWord.count({
+      where: {
+        userId,
+        rapidFireWord: { rapidFireLesson: { jlptLevel } },
+      },
+    });
+
+    await this.databaseService.rapidFireOverallStat.upsert({
+      where: {
+        userId_jlptLevel: {
+          userId,
+          jlptLevel,
+        },
+      },
+      create: {
+        userId,
+        jlptLevel,
+        totalHardWords: totalHardCount,
+      },
+      update: {
+        totalHardWords: totalHardCount,
+      },
+    });
+
+    await this.cache.delete(this.cacheKey(userId, jlptLevel));
+
+    return {
+      wordId,
+      isHard,
+      totalHardWords: totalHardCount,
+    };
+  }
+
+  async markHardWord(
+    userId: string,
+    wordId: string,
+  ): Promise<ToggleHardWordResponseDto> {
+    const word = await this.databaseService.rapidFireWord.findUnique({
+      where: { id: wordId },
+      include: { rapidFireLesson: true },
+    });
+
+    if (!word) {
+      throw new NotFoundException(`Word with id '${wordId}' not found`);
+    }
+
+    const existing = await this.databaseService.hardWord.findUnique({
+      where: {
+        userId_rapidFireWordId: {
+          userId,
+          rapidFireWordId: wordId,
+        },
+      },
+    });
+
+    if (!existing) {
+      await this.databaseService.hardWord.create({
+        data: {
+          userId,
+          rapidFireWordId: wordId,
+        },
+      });
+    }
+
+    const jlptLevel = word.rapidFireLesson?.jlptLevel || JlptLevel.N5;
+    const totalHardCount = await this.databaseService.hardWord.count({
+      where: {
+        userId,
+        rapidFireWord: { rapidFireLesson: { jlptLevel } },
+      },
+    });
+
+    await this.databaseService.rapidFireOverallStat.upsert({
+      where: {
+        userId_jlptLevel: {
+          userId,
+          jlptLevel,
+        },
+      },
+      create: {
+        userId,
+        jlptLevel,
+        totalHardWords: totalHardCount,
+      },
+      update: {
+        totalHardWords: totalHardCount,
+      },
+    });
+
+    await this.cache.delete(this.cacheKey(userId, jlptLevel));
+
+    return {
+      wordId,
+      isHard: true,
+      totalHardWords: totalHardCount,
+    };
+  }
+
+  async unmarkHardWord(
+    userId: string,
+    wordId: string,
+  ): Promise<ToggleHardWordResponseDto> {
+    const word = await this.databaseService.rapidFireWord.findUnique({
+      where: { id: wordId },
+      include: { rapidFireLesson: true },
+    });
+
+    if (!word) {
+      throw new NotFoundException(`Word with id '${wordId}' not found`);
+    }
+
+    const existing = await this.databaseService.hardWord.findUnique({
+      where: {
+        userId_rapidFireWordId: {
+          userId,
+          rapidFireWordId: wordId,
+        },
+      },
+    });
+
+    if (existing) {
+      await this.databaseService.hardWord.delete({
+        where: { id: existing.id },
+      });
+    }
+
+    const jlptLevel = word.rapidFireLesson?.jlptLevel || JlptLevel.N5;
+    const totalHardCount = await this.databaseService.hardWord.count({
+      where: {
+        userId,
+        rapidFireWord: { rapidFireLesson: { jlptLevel } },
+      },
+    });
+
+    await this.databaseService.rapidFireOverallStat.upsert({
+      where: {
+        userId_jlptLevel: {
+          userId,
+          jlptLevel,
+        },
+      },
+      create: {
+        userId,
+        jlptLevel,
+        totalHardWords: totalHardCount,
+      },
+      update: {
+        totalHardWords: totalHardCount,
+      },
+    });
+
+    await this.cache.delete(this.cacheKey(userId, jlptLevel));
+
+    return {
+      wordId,
+      isHard: false,
+      totalHardWords: totalHardCount,
+    };
   }
 
   async submitAnswers(
@@ -526,6 +1047,7 @@ export class RapidFireService {
       reading: word.reading,
       romaji: word.romaji,
       meaning: word.meaning,
+      rapidFireLessonId: word.rapidFireLessonId,
       isHard: !!isHard,
     };
   }

@@ -201,7 +201,7 @@ export class PaymentsService {
     const backendUrl = process.env.BACKEND_URL || "http://localhost:3000";
 
     const paymentData = {
-      total_amount: plan.price,
+      total_amount: Number(plan.price),
       currency: plan.currency,
       tran_id: tranId,
       success_url: `${backendUrl}/api/payments/success`,
@@ -293,7 +293,7 @@ export class PaymentsService {
         );
         await this.databaseService.transaction.updateMany({
           where: { tranId, status: TransactionStatus.PENDING },
-          data: { status: TransactionStatus.FAILED, valId },
+          data: { status: TransactionStatus.FAILED, valId, gatewayPayload: validationResponse },
         });
         return false;
       }
@@ -305,7 +305,7 @@ export class PaymentsService {
         );
         await this.databaseService.transaction.updateMany({
           where: { tranId, status: TransactionStatus.PENDING },
-          data: { status: TransactionStatus.FAILED, valId },
+          data: { status: TransactionStatus.FAILED, valId, gatewayPayload: validationResponse },
         });
         return false;
       }
@@ -320,7 +320,7 @@ export class PaymentsService {
         );
         await this.databaseService.transaction.updateMany({
           where: { tranId, status: TransactionStatus.PENDING },
-          data: { status: TransactionStatus.FAILED, valId },
+          data: { status: TransactionStatus.FAILED, valId, gatewayPayload: validationResponse },
         });
         return false;
       }
@@ -340,7 +340,7 @@ export class PaymentsService {
         );
         await this.databaseService.transaction.updateMany({
           where: { tranId, status: TransactionStatus.PENDING },
-          data: { status: TransactionStatus.FAILED, valId },
+          data: { status: TransactionStatus.FAILED, valId, gatewayPayload: validationResponse },
         });
         return false;
       }
@@ -349,16 +349,17 @@ export class PaymentsService {
       const validatedAmount = parseFloat(
         validationResponse.amount || validationResponse.currency_amount,
       );
+      const expectedAmount = Number(transaction.amount);
       if (
         isNaN(validatedAmount) ||
-        Math.abs(validatedAmount - transaction.amount) > 1
+        Math.abs(validatedAmount - expectedAmount) > 1
       ) {
         this.logger.error(
-          `Amount mismatch for tranId: ${tranId}. Expected ${transaction.amount}, received ${validatedAmount}`,
+          `Amount mismatch for tranId: ${tranId}. Expected ${expectedAmount}, received ${validatedAmount}`,
         );
         await this.databaseService.transaction.updateMany({
           where: { tranId, status: TransactionStatus.PENDING },
-          data: { status: TransactionStatus.FAILED, valId },
+          data: { status: TransactionStatus.FAILED, valId, gatewayPayload: validationResponse },
         });
         return false;
       }
@@ -379,6 +380,7 @@ export class PaymentsService {
                 validationResponse.card_type ||
                 validationResponse.card_issuer ||
                 "SSLCOMMERZ",
+              gatewayPayload: validationResponse,
             },
           });
 
@@ -396,8 +398,11 @@ export class PaymentsService {
             create: {
               userId: transaction.userId,
               planType: transaction.planToBuy,
+              ...(transaction.id && { transactionId: transaction.id }),
             },
-            update: {},
+            update: {
+              ...(transaction.id && { transactionId: transaction.id }),
+            },
           });
 
           return { alreadyFulfilled: false };
@@ -663,8 +668,11 @@ export class PaymentsService {
           create: {
             userId: dto.userId,
             planType: dto.planType,
+            ...(updatedOrCreatedTx.id && { transactionId: updatedOrCreatedTx.id }),
           },
-          update: {},
+          update: {
+            ...(updatedOrCreatedTx.id && { transactionId: updatedOrCreatedTx.id }),
+          },
         });
 
         await tx.auditLog.create({
@@ -767,18 +775,27 @@ export class PaymentsService {
         },
       });
 
-      const latestTx = await tx.transaction.findFirst({
-        where: {
-          userId: dto.userId,
-          planToBuy: dto.planType,
-          status: TransactionStatus.SUCCESS,
-        },
-        orderBy: { createdAt: "desc" },
-      });
+      let targetTx: Transaction | null = null;
+      if (existingPurchase.transactionId) {
+        targetTx = await tx.transaction.findUnique({
+          where: { id: existingPurchase.transactionId },
+        });
+      }
 
-      if (latestTx) {
+      if (!targetTx) {
+        targetTx = await tx.transaction.findFirst({
+          where: {
+            userId: dto.userId,
+            planToBuy: dto.planType,
+            status: TransactionStatus.SUCCESS,
+          },
+          orderBy: { createdAt: "desc" },
+        });
+      }
+
+      if (targetTx) {
         await tx.transaction.update({
-          where: { id: latestTx.id },
+          where: { id: targetTx.id },
           data: {
             status: TransactionStatus.CANCELLED,
             paymentMethod: auditNote,
@@ -793,8 +810,8 @@ export class PaymentsService {
           targetId: dto.userId,
           details: {
             planType: dto.planType,
-            transactionId: latestTx?.id || null,
-            tranId: latestTx?.tranId || null,
+            transactionId: targetTx?.id || null,
+            tranId: targetTx?.tranId || null,
             reason: dto.reason || "Manual revocation by admin",
           },
         },
