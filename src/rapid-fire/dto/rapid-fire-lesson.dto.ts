@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { JlptLevel } from "@prisma/client";
 
 export class RapidFireLessonDto {
@@ -19,4 +19,16 @@ export class RapidFireLessonDto {
     example: false,
   })
   isPremium!: boolean;
+
+  @ApiPropertyOptional({
+    description: "Total vocabulary words in this lesson",
+    example: 34,
+  })
+  wordCount?: number;
+
+  @ApiPropertyOptional({
+    description: "Whether the requesting user has access to this lesson",
+    example: true,
+  })
+  isUnlocked?: boolean;
 }

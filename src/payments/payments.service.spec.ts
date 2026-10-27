@@ -238,6 +238,7 @@ describe("PaymentsService", () => {
 
     it("should fulfill transaction and grant UserPurchase on valid validation response", async () => {
       mockDatabaseService.transaction.findUnique.mockResolvedValue({
+        id: "tx-123",
         userId: "user-1",
         tranId: "MK_123",
         status: TransactionStatus.PENDING,
@@ -270,6 +271,7 @@ describe("PaymentsService", () => {
           data: expect.objectContaining({
             status: TransactionStatus.SUCCESS,
             valId: "VAL_123",
+            gatewayPayload: expect.objectContaining({ status: "VALID" }),
           }),
         }),
       );
@@ -281,6 +283,11 @@ describe("PaymentsService", () => {
               planType: PlanType.N5,
             },
           },
+          create: expect.objectContaining({
+            userId: "user-1",
+            planType: PlanType.N5,
+            transactionId: "tx-123",
+          }),
         }),
       );
     });
@@ -819,6 +826,45 @@ describe("PaymentsService", () => {
             adminId: "admin-123",
             action: "PURCHASE_REVOKED",
             targetId: "user-1",
+          }),
+        }),
+      );
+    });
+
+    it("should cancel linked transaction directly using transactionId when present on UserPurchase", async () => {
+      mockDatabaseService.user.findUnique.mockResolvedValue({ id: "user-1" });
+      mockDatabaseService.userPurchase.findUnique.mockResolvedValue({
+        userId: "user-1",
+        planType: PlanType.N5,
+        transactionId: "linked-tx-999",
+      });
+      mockDatabaseService.userPurchase.delete.mockResolvedValue({});
+      mockDatabaseService.transaction.findUnique.mockResolvedValue({
+        id: "linked-tx-999",
+        tranId: "MK_999",
+        status: TransactionStatus.SUCCESS,
+      });
+      mockDatabaseService.transaction.update.mockResolvedValue({});
+
+      const result = await service.adminInvalidatePurchase(
+        {
+          userId: "user-1",
+          planType: PlanType.N5,
+          reason: "Chargeback dispute",
+        },
+        "admin-123",
+      );
+
+      expect(result.message).toBe("Purchase successfully invalidated");
+      expect(mockDatabaseService.transaction.findUnique).toHaveBeenCalledWith({
+        where: { id: "linked-tx-999" },
+      });
+      expect(mockDatabaseService.transaction.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "linked-tx-999" },
+          data: expect.objectContaining({
+            status: TransactionStatus.CANCELLED,
+            paymentMethod: "REVOKED_BY_ADMIN: Chargeback dispute",
           }),
         }),
       );

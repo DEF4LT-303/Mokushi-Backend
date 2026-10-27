@@ -88,6 +88,7 @@ npm run seed:modules      # Seed JLPT modules
 npm run seed:rules        # Seed grammar rules
 npm run seed:questions    # Seed question bank
 npm run seed:users        # Seed test users
+npm run seed:rapid-fire   # Seed rapid-fire lessons & words (from English dataset)
 ```
 
 ### Running the Application
