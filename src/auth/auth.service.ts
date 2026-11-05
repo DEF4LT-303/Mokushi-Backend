@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
+import { SafeUser } from "prisma/safe-user.select";
 import { hashToken, parseExpiryToDate } from "src/common/utils/jwt.helpers";
 import { DatabaseService } from "src/database/database.service";
 import { UsersService } from "src/users/users.service";
@@ -65,18 +66,14 @@ export class AuthService {
 
     const user = await this.usersService.findById(userId);
 
+    if (!user) {
+      throw new Error("User not found");
+    }
+
     return {
       accessToken,
       refreshToken,
-      user: {
-        id: user?.id,
-        email: user?.email,
-        firstName: user?.firstName,
-        lastName: user?.lastName,
-        fullName: user?.fullName,
-        picture: user?.picture,
-        role: user?.role,
-      },
+      user,
     };
   }
 
