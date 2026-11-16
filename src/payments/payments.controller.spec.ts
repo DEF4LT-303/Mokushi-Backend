@@ -1,5 +1,5 @@
 import { Test, TestingModule } from "@nestjs/testing";
-import { PlanCategory, PlanType } from "@prisma/client";
+import { PlanCategory, PlanType, TransactionStatus } from "@prisma/client";
 import { PaymentsController } from "./payments.controller";
 import { PaymentsService } from "./payments.service";
 
@@ -54,8 +54,13 @@ describe("PaymentsController", () => {
         expired: 0,
         failed: 0,
       }),
+      getTransactionStatus: jest.fn().mockResolvedValue({
+        tranId: "MK_123",
+        status: TransactionStatus.SUCCESS,
+        isSuccess: true,
+      }),
       getFrontendRedirectUrl: jest.fn((status, tranId) => {
-        return `http://localhost:5173/payment-status?status=${status}&tran_id=${tranId}`;
+        return `http://localhost:5173/payments/payment-status?status=${status}&tran_id=${tranId}`;
       }),
     };
 
@@ -129,7 +134,7 @@ describe("PaymentsController", () => {
         mockPaymentsService.validateAndFulfillPayment,
       ).toHaveBeenCalledWith("VAL_123", "MK_123", "BKASH");
       expect(mockRes.redirect).toHaveBeenCalledWith(
-        "http://localhost:5173/payment-status?status=success&tran_id=MK_123",
+        "http://localhost:5173/payments/payment-status?status=success&tran_id=MK_123",
       );
     });
 
@@ -175,9 +180,10 @@ describe("PaymentsController", () => {
 
       expect(mockPaymentsService.handlePaymentFailure).toHaveBeenCalledWith(
         "MK_123",
+        body,
       );
       expect(mockRes.redirect).toHaveBeenCalledWith(
-        "http://localhost:5173/payment-status?status=failed&tran_id=MK_123",
+        "http://localhost:5173/payments/payment-status?status=failed&tran_id=MK_123",
       );
     });
   });
@@ -193,9 +199,10 @@ describe("PaymentsController", () => {
 
       expect(mockPaymentsService.handlePaymentCancel).toHaveBeenCalledWith(
         "MK_123",
+        body,
       );
       expect(mockRes.redirect).toHaveBeenCalledWith(
-        "http://localhost:5173/payment-status?status=cancelled&tran_id=MK_123",
+        "http://localhost:5173/payments/payment-status?status=cancelled&tran_id=MK_123",
       );
     });
   });
@@ -215,6 +222,70 @@ describe("PaymentsController", () => {
         mockPaymentsService.validateAndFulfillPayment,
       ).toHaveBeenCalledWith("VAL_123", "MK_123", "BKASH");
       expect(result).toEqual({ message: "IPN received successfully" });
+    });
+  });
+
+  describe("getPaymentStatus and aliases", () => {
+    it("should call getTransactionStatus with tranId from param and user", async () => {
+      const user = { id: "user-123" };
+      const result = await controller.getPaymentStatus("MK_PARAM_1", user);
+
+      expect(mockPaymentsService.getTransactionStatus).toHaveBeenCalledWith(
+        "MK_PARAM_1",
+        user,
+      );
+      expect(result).toEqual({
+        tranId: "MK_123",
+        status: TransactionStatus.SUCCESS,
+        isSuccess: true,
+      });
+    });
+
+    it("should call getTransactionStatus with tran_id from query", async () => {
+      const user = { id: "user-123" };
+      await controller.getPaymentStatusByQuery(user, {
+        tran_id: "MK_QUERY_1",
+      });
+
+      expect(mockPaymentsService.getTransactionStatus).toHaveBeenCalledWith(
+        "MK_QUERY_1",
+        user,
+      );
+    });
+
+    it("should call getTransactionStatus with tranId from query", async () => {
+      const user = { id: "user-123" };
+      await controller.getPaymentStatusByQuery(user, {
+        tranId: "MK_QUERY_CAMEL",
+      });
+
+      expect(mockPaymentsService.getTransactionStatus).toHaveBeenCalledWith(
+        "MK_QUERY_CAMEL",
+        user,
+      );
+    });
+
+    it("should throw BadRequestException if neither tran_id nor tranId is provided in query", async () => {
+      await expect(
+        controller.getPaymentStatusByQuery({ id: "user-123" }, {}),
+      ).rejects.toThrow("Transaction ID is required");
+    });
+
+    it("should support alias endpoints", async () => {
+      const user = { id: "user-123" };
+      await controller.getPaymentStatusAlias("MK_ALIAS_1", user);
+      expect(mockPaymentsService.getTransactionStatus).toHaveBeenCalledWith(
+        "MK_ALIAS_1",
+        user,
+      );
+
+      await controller.getPaymentStatusByQueryAlias(user, {
+        tran_id: "MK_ALIAS_Q",
+      });
+      expect(mockPaymentsService.getTransactionStatus).toHaveBeenCalledWith(
+        "MK_ALIAS_Q",
+        user,
+      );
     });
   });
 

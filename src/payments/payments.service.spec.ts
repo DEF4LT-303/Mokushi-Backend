@@ -1,6 +1,15 @@
-import { BadRequestException, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
-import { PlanCategory, PlanType, TransactionStatus } from "@prisma/client";
+import {
+  PlanCategory,
+  PlanType,
+  Role,
+  TransactionStatus,
+} from "@prisma/client";
 import { DatabaseService } from "src/database/database.service";
 import { PLAN_CONFIGS } from "./constants/plans.constant";
 import { PaymentsService } from "./payments.service";
@@ -1023,27 +1032,27 @@ describe("PaymentsService", () => {
       process.env.FRONTEND_URL = originalFrontendUrl;
     });
 
-    it("should redirect to /payment-status with status and tran_id for success status", () => {
+    it("should redirect to /payments/payment-status with status and tran_id for success status", () => {
       process.env.FRONTEND_URL = "https://mokushiken.com";
       const url = service.getFrontendRedirectUrl("success", "MK_SUCCESS_1");
       expect(url).toBe(
-        "https://mokushiken.com/payment-status?status=success&tran_id=MK_SUCCESS_1",
+        "https://mokushiken.com/payments/payment-status?status=success&tran_id=MK_SUCCESS_1",
       );
     });
 
-    it("should redirect to /payment-status with status and tran_id for failed status", () => {
+    it("should redirect to /payments/payment-status with status and tran_id for failed status", () => {
       process.env.FRONTEND_URL = "https://mokushiken.com";
       const url = service.getFrontendRedirectUrl("failed", "MK_FAILED_1");
       expect(url).toBe(
-        "https://mokushiken.com/payment-status?status=failed&tran_id=MK_FAILED_1",
+        "https://mokushiken.com/payments/payment-status?status=failed&tran_id=MK_FAILED_1",
       );
     });
 
-    it("should redirect to /payment-status with status and tran_id for cancelled status", () => {
+    it("should redirect to /payments/payment-status with status and tran_id for cancelled status", () => {
       process.env.FRONTEND_URL = "https://mokushiken.com";
       const url = service.getFrontendRedirectUrl("cancelled", "MK_CANCEL_1");
       expect(url).toBe(
-        "https://mokushiken.com/payment-status?status=cancelled&tran_id=MK_CANCEL_1",
+        "https://mokushiken.com/payments/payment-status?status=cancelled&tran_id=MK_CANCEL_1",
       );
     });
 
@@ -1051,7 +1060,7 @@ describe("PaymentsService", () => {
       process.env.FRONTEND_URL = "https://mokushiken.com/";
       const url = service.getFrontendRedirectUrl("success", "MK_SUCCESS_2");
       expect(url).toBe(
-        "https://mokushiken.com/payment-status?status=success&tran_id=MK_SUCCESS_2",
+        "https://mokushiken.com/payments/payment-status?status=success&tran_id=MK_SUCCESS_2",
       );
     });
 
@@ -1059,7 +1068,7 @@ describe("PaymentsService", () => {
       delete process.env.FRONTEND_URL;
       const url = service.getFrontendRedirectUrl("success", "MK_LOCAL");
       expect(url).toBe(
-        "http://localhost:5173/payment-status?status=success&tran_id=MK_LOCAL",
+        "http://localhost:5173/payments/payment-status?status=success&tran_id=MK_LOCAL",
       );
     });
   });
@@ -1120,6 +1129,310 @@ describe("PaymentsService", () => {
         where: { planType: PlanType.N5 },
         data: { price: 599 },
       });
+    });
+  });
+
+  describe("getTransactionStatus", () => {
+    it("should throw BadRequestException if tranId is missing or empty", async () => {
+      await expect(service.getTransactionStatus("")).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.getTransactionStatus("   ")).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it("should throw NotFoundException if transaction is not found", async () => {
+      mockDatabaseService.transaction.findUnique.mockResolvedValue(null);
+      await expect(
+        service.getTransactionStatus("MK_NOT_FOUND"),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it("should throw ForbiddenException if logged-in user does not own the transaction and is not admin", async () => {
+      mockDatabaseService.transaction.findUnique.mockResolvedValue({
+        tranId: "MK_OTHER",
+        userId: "user-owner",
+        status: TransactionStatus.SUCCESS,
+        amount: 499,
+        currency: "BDT",
+        planToBuy: PlanType.N5,
+        user: {
+          id: "user-owner",
+          email: "owner@test.com",
+          fullName: "Owner User",
+        },
+      });
+
+      await expect(
+        service.getTransactionStatus("MK_OTHER", {
+          id: "user-intruder",
+          role: Role.USER,
+        }),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it("should return full details for successful transaction when requested by owner", async () => {
+      const mockTx = {
+        id: "tx-1",
+        tranId: "MK_SUCCESS_100",
+        valId: "VAL_100",
+        userId: "user-1",
+        status: TransactionStatus.SUCCESS,
+        amount: 499,
+        currency: "BDT",
+        planToBuy: PlanType.N5,
+        paymentMethod: "BKASH",
+        gatewayPayload: { bank_tran_id: "BANK_123", card_type: "BKASH" },
+        createdAt: new Date("2026-03-01T10:00:00Z"),
+        updatedAt: new Date("2026-03-01T10:05:00Z"),
+        plan: PLAN_CONFIGS[PlanType.N5],
+        user: {
+          id: "user-1",
+          email: "learner@mokushiken.com",
+          fullName: "Mokushi Student",
+          role: Role.USER,
+        },
+        purchase: {
+          purchasedAt: new Date("2026-03-01T10:05:00Z"),
+        },
+      };
+
+      mockDatabaseService.transaction.findUnique.mockResolvedValue(mockTx);
+      mockDatabaseService.userPurchase.findMany.mockResolvedValue([
+        { planType: PlanType.N5 },
+      ]);
+
+      const result = await service.getTransactionStatus("MK_SUCCESS_100", {
+        id: "user-1",
+        role: Role.USER,
+      });
+
+      expect(result.tranId).toBe("MK_SUCCESS_100");
+      expect(result.status).toBe(TransactionStatus.SUCCESS);
+      expect(result.isSuccess).toBe(true);
+      expect(result.isFailed).toBe(false);
+      expect(result.amount).toBe(499);
+      expect(result.currency).toBe("BDT");
+      expect(result.paymentMethod).toBe("BKASH");
+      expect(result.customer.email).toBe("learner@mokushiken.com");
+      expect(result.customer.name).toBe("Mokushi Student");
+      expect(result.plan.title).toBe("JLPT N5");
+      expect(result.accessSummary).toEqual({
+        hasN5: true,
+        hasN4: false,
+        hasRapidFireN5: false,
+        hasRapidFireN4: false,
+      });
+      expect(result.message).toContain("Payment completed successfully");
+    });
+
+    it("should allow admin to view any transaction with full details", async () => {
+      const mockTx = {
+        id: "tx-admin-view",
+        tranId: "MK_SUCCESS_ADMIN",
+        valId: "VAL_ADMIN",
+        userId: "user-customer",
+        status: TransactionStatus.SUCCESS,
+        amount: 499,
+        currency: "BDT",
+        planToBuy: PlanType.N5,
+        paymentMethod: "BKASH",
+        createdAt: new Date("2026-03-01T10:00:00Z"),
+        updatedAt: new Date("2026-03-01T10:05:00Z"),
+        plan: PLAN_CONFIGS[PlanType.N5],
+        user: {
+          id: "user-customer",
+          email: "customer@mokushiken.com",
+          fullName: "Customer User",
+          role: Role.USER,
+        },
+      };
+
+      mockDatabaseService.transaction.findUnique.mockResolvedValue(mockTx);
+      mockDatabaseService.userPurchase.findMany.mockResolvedValue([
+        { planType: PlanType.N5 },
+      ]);
+
+      const result = await service.getTransactionStatus("MK_SUCCESS_ADMIN", {
+        id: "admin-1",
+        role: Role.ADMIN,
+      });
+
+      expect(result.tranId).toBe("MK_SUCCESS_ADMIN");
+      expect(result.customer.email).toBe("customer@mokushiken.com");
+      expect(result.customer.name).toBe("Customer User");
+    });
+
+    it("should mask customer email and name when requested anonymously", async () => {
+      const mockTx = {
+        id: "tx-2",
+        tranId: "MK_SUCCESS_ANON",
+        valId: "VAL_ANON",
+        userId: "user-anon-owner",
+        status: TransactionStatus.SUCCESS,
+        amount: 499,
+        currency: "BDT",
+        planToBuy: PlanType.N5,
+        paymentMethod: "BKASH",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        plan: PLAN_CONFIGS[PlanType.N5],
+        user: {
+          id: "user-anon-owner",
+          email: "student@mokushiken.com",
+          fullName: "Mokushi Student",
+          role: Role.USER,
+        },
+      };
+
+      mockDatabaseService.transaction.findUnique.mockResolvedValue(mockTx);
+      mockDatabaseService.userPurchase.findMany.mockResolvedValue([
+        { planType: PlanType.N5 },
+      ]);
+
+      const result = await service.getTransactionStatus("MK_SUCCESS_ANON");
+
+      expect(result.tranId).toBe("MK_SUCCESS_ANON");
+      expect(result.customer.email).toBe("st***@mokushiken.com");
+      expect(result.customer.name).toBe("M***** S*****");
+    });
+
+    it("should return failed scenario details with failureReason", async () => {
+      const mockTx = {
+        id: "tx-fail",
+        tranId: "MK_FAIL_100",
+        valId: null,
+        userId: "user-1",
+        status: TransactionStatus.FAILED,
+        amount: 499,
+        currency: "BDT",
+        planToBuy: PlanType.N5,
+        paymentMethod: null,
+        gatewayPayload: {
+          failedreason: "Insufficient funds in bank account",
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        plan: PLAN_CONFIGS[PlanType.N5],
+        user: {
+          id: "user-1",
+          email: "learner@mokushiken.com",
+          fullName: "Mokushi Student",
+          role: Role.USER,
+        },
+      };
+
+      mockDatabaseService.transaction.findUnique.mockResolvedValue(mockTx);
+
+      const result = await service.getTransactionStatus("MK_FAIL_100", {
+        id: "user-1",
+        role: Role.USER,
+      });
+
+      expect(result.status).toBe(TransactionStatus.FAILED);
+      expect(result.isSuccess).toBe(false);
+      expect(result.isFailed).toBe(true);
+      expect(result.failureReason).toBe("Insufficient funds in bank account");
+      expect(result.message).toBe("Insufficient funds in bank account");
+    });
+
+    it("should return cancelled scenario details", async () => {
+      const mockTx = {
+        id: "tx-cancel",
+        tranId: "MK_CANCEL_100",
+        valId: null,
+        userId: "user-1",
+        status: TransactionStatus.CANCELLED,
+        amount: 499,
+        currency: "BDT",
+        planToBuy: PlanType.N5,
+        paymentMethod: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        plan: PLAN_CONFIGS[PlanType.N5],
+        user: {
+          id: "user-1",
+          email: "learner@mokushiken.com",
+          fullName: "Mokushi Student",
+          role: Role.USER,
+        },
+      };
+
+      mockDatabaseService.transaction.findUnique.mockResolvedValue(mockTx);
+
+      const result = await service.getTransactionStatus("MK_CANCEL_100", {
+        id: "user-1",
+        role: Role.USER,
+      });
+
+      expect(result.status).toBe(TransactionStatus.CANCELLED);
+      expect(result.isSuccess).toBe(false);
+      expect(result.isCancelled).toBe(true);
+      expect(result.failureReason).toBe("Payment was cancelled by the user.");
+      expect(result.message).toContain("cancelled");
+    });
+
+    it("should query gateway if transaction is PENDING and fulfill if valid", async () => {
+      const pendingTx = {
+        id: "tx-pending",
+        tranId: "MK_PENDING_100",
+        valId: null,
+        userId: "user-1",
+        status: TransactionStatus.PENDING,
+        amount: 499,
+        currency: "BDT",
+        planToBuy: PlanType.N5,
+        paymentMethod: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        plan: PLAN_CONFIGS[PlanType.N5],
+        user: {
+          id: "user-1",
+          email: "learner@mokushiken.com",
+          fullName: "Mokushi Student",
+          role: Role.USER,
+        },
+      };
+
+      const fulfilledTx = {
+        ...pendingTx,
+        status: TransactionStatus.SUCCESS,
+        valId: "VAL_GATEWAY",
+        paymentMethod: "BKASH",
+      };
+
+      mockDatabaseService.transaction.findUnique
+        .mockResolvedValueOnce(pendingTx)
+        .mockResolvedValueOnce(fulfilledTx);
+
+      jest
+        .spyOn(service as any, "validateAndFulfillPayment")
+        .mockResolvedValue(true);
+
+      (service as any).sslcommerz = {
+        transactionQueryByTransactionId: jest.fn().mockResolvedValue({
+          element: [
+            {
+              status: "VALID",
+              val_id: "VAL_GATEWAY",
+              card_type: "BKASH",
+            },
+          ],
+        }),
+      };
+
+      mockDatabaseService.userPurchase.findMany.mockResolvedValue([
+        { planType: PlanType.N5 },
+      ]);
+
+      const result = await service.getTransactionStatus("MK_PENDING_100", {
+        id: "user-1",
+        role: Role.USER,
+      });
+
+      expect(result.status).toBe(TransactionStatus.SUCCESS);
+      expect(result.isSuccess).toBe(true);
     });
   });
 });

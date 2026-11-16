@@ -309,12 +309,18 @@ describe("RapidFireService", () => {
 
   describe("getRapidFireWordsForLesson", () => {
     it("should throw ForbiddenException if user has no access to premium lesson", async () => {
-      databaseService.rapidFireLesson.findUnique.mockResolvedValue(mockLessonN5);
+      databaseService.rapidFireLesson.findUnique.mockResolvedValue(
+        mockLessonN5,
+      );
       databaseService.userPurchase.findMany.mockResolvedValue([]);
 
       const regularUser = { id: "user-1", role: Role.USER };
       await expect(
-        service.getRapidFireWordsForLesson("rf-lesson-1", "user-1", regularUser),
+        service.getRapidFireWordsForLesson(
+          "rf-lesson-1",
+          "user-1",
+          regularUser,
+        ),
       ).rejects.toThrow(ForbiddenException);
     });
 

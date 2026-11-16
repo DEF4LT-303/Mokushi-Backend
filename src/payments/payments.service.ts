@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -9,6 +10,7 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import {
   PlanCategory,
   PlanType,
+  Role,
   Transaction,
   TransactionStatus,
 } from "@prisma/client";
@@ -293,7 +295,11 @@ export class PaymentsService {
         );
         await this.databaseService.transaction.updateMany({
           where: { tranId, status: TransactionStatus.PENDING },
-          data: { status: TransactionStatus.FAILED, valId, gatewayPayload: validationResponse },
+          data: {
+            status: TransactionStatus.FAILED,
+            valId,
+            gatewayPayload: validationResponse,
+          },
         });
         return false;
       }
@@ -305,7 +311,11 @@ export class PaymentsService {
         );
         await this.databaseService.transaction.updateMany({
           where: { tranId, status: TransactionStatus.PENDING },
-          data: { status: TransactionStatus.FAILED, valId, gatewayPayload: validationResponse },
+          data: {
+            status: TransactionStatus.FAILED,
+            valId,
+            gatewayPayload: validationResponse,
+          },
         });
         return false;
       }
@@ -320,7 +330,11 @@ export class PaymentsService {
         );
         await this.databaseService.transaction.updateMany({
           where: { tranId, status: TransactionStatus.PENDING },
-          data: { status: TransactionStatus.FAILED, valId, gatewayPayload: validationResponse },
+          data: {
+            status: TransactionStatus.FAILED,
+            valId,
+            gatewayPayload: validationResponse,
+          },
         });
         return false;
       }
@@ -340,7 +354,11 @@ export class PaymentsService {
         );
         await this.databaseService.transaction.updateMany({
           where: { tranId, status: TransactionStatus.PENDING },
-          data: { status: TransactionStatus.FAILED, valId, gatewayPayload: validationResponse },
+          data: {
+            status: TransactionStatus.FAILED,
+            valId,
+            gatewayPayload: validationResponse,
+          },
         });
         return false;
       }
@@ -359,7 +377,11 @@ export class PaymentsService {
         );
         await this.databaseService.transaction.updateMany({
           where: { tranId, status: TransactionStatus.PENDING },
-          data: { status: TransactionStatus.FAILED, valId, gatewayPayload: validationResponse },
+          data: {
+            status: TransactionStatus.FAILED,
+            valId,
+            gatewayPayload: validationResponse,
+          },
         });
         return false;
       }
@@ -429,22 +451,38 @@ export class PaymentsService {
     }
   }
 
-  async handlePaymentFailure(tranId: string) {
+  async handlePaymentFailure(tranId: string, payload?: any) {
     if (!tranId) return;
+    const data: any = { status: TransactionStatus.FAILED };
+    if (
+      payload &&
+      typeof payload === "object" &&
+      Object.keys(payload).length > 0
+    ) {
+      data.gatewayPayload = payload;
+    }
     const result = await this.databaseService.transaction.updateMany({
       where: { tranId, status: TransactionStatus.PENDING },
-      data: { status: TransactionStatus.FAILED },
+      data,
     });
     if (result.count > 0) {
       this.logger.log(`Marked transaction ${tranId} as FAILED`);
     }
   }
 
-  async handlePaymentCancel(tranId: string) {
+  async handlePaymentCancel(tranId: string, payload?: any) {
     if (!tranId) return;
+    const data: any = { status: TransactionStatus.CANCELLED };
+    if (
+      payload &&
+      typeof payload === "object" &&
+      Object.keys(payload).length > 0
+    ) {
+      data.gatewayPayload = payload;
+    }
     const result = await this.databaseService.transaction.updateMany({
       where: { tranId, status: TransactionStatus.PENDING },
-      data: { status: TransactionStatus.CANCELLED },
+      data,
     });
     if (result.count > 0) {
       this.logger.log(`Marked transaction ${tranId} as CANCELLED`);
@@ -476,7 +514,328 @@ export class PaymentsService {
       process.env.FRONTEND_URL || "http://localhost:5173"
     ).replace(/\/+$/, "");
 
-    return `${frontendUrl}/payment-status?status=${status}&tran_id=${tranId || ""}`;
+    return `${frontendUrl}/payments/payment-status?status=${status}&tran_id=${tranId || ""}`;
+  }
+
+  async getTransactionStatus(tranId: string, requestingUser?: any) {
+    if (!tranId || !tranId.trim()) {
+      throw new BadRequestException("Transaction ID is required");
+    }
+
+    const cleanTranId = tranId.trim();
+
+    let transaction = await this.databaseService.transaction.findUnique({
+      where: { tranId: cleanTranId },
+      include: {
+        plan: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+            fullName: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+        purchase: true,
+      },
+    });
+
+    if (!transaction) {
+      throw new NotFoundException(
+        `Payment transaction with ID '${cleanTranId}' not found`,
+      );
+    }
+
+    // If transaction is still PENDING, perform a real-time gateway status query
+    if (transaction.status === TransactionStatus.PENDING) {
+      try {
+        const queryResult =
+          await this.sslcommerz.transactionQueryByTransactionId({
+            tran_id: cleanTranId,
+          });
+
+        const item = queryResult?.element?.[0];
+        const itemStatus = item?.status?.toUpperCase();
+
+        if (itemStatus === "VALID" || itemStatus === "VALIDATED") {
+          this.logger.log(
+            `Live Status Query: Fulfilling pending transaction ${cleanTranId}`,
+          );
+          await this.validateAndFulfillPayment(
+            item.val_id,
+            cleanTranId,
+            item.card_type,
+          );
+          transaction = await this.databaseService.transaction.findUnique({
+            where: { tranId: cleanTranId },
+            include: {
+              plan: true,
+              user: {
+                select: {
+                  id: true,
+                  email: true,
+                  fullName: true,
+                  firstName: true,
+                  lastName: true,
+                  role: true,
+                },
+              },
+              purchase: true,
+            },
+          });
+        } else if (itemStatus === "FAILED") {
+          await this.handlePaymentFailure(cleanTranId, item);
+          transaction = await this.databaseService.transaction.findUnique({
+            where: { tranId: cleanTranId },
+            include: {
+              plan: true,
+              user: {
+                select: {
+                  id: true,
+                  email: true,
+                  fullName: true,
+                  firstName: true,
+                  lastName: true,
+                  role: true,
+                },
+              },
+              purchase: true,
+            },
+          });
+        } else if (itemStatus === "CANCELLED") {
+          await this.handlePaymentCancel(cleanTranId, item);
+          transaction = await this.databaseService.transaction.findUnique({
+            where: { tranId: cleanTranId },
+            include: {
+              plan: true,
+              user: {
+                select: {
+                  id: true,
+                  email: true,
+                  fullName: true,
+                  firstName: true,
+                  lastName: true,
+                  role: true,
+                },
+              },
+              purchase: true,
+            },
+          });
+        }
+      } catch (err) {
+        this.logger.warn(
+          `Live Status Query: Failed to query gateway for tranId ${cleanTranId}: ${err.message}`,
+        );
+      }
+    }
+
+    if (!transaction) {
+      throw new NotFoundException(
+        `Payment transaction with ID '${cleanTranId}' not found`,
+      );
+    }
+
+    // Access control:
+    // If a user is logged in, verify they own this transaction (or are an admin)
+    const requestingUserId =
+      requestingUser?.id || requestingUser?.userId || requestingUser?.sub;
+    const isAdmin = requestingUser?.role === Role.ADMIN;
+
+    if (
+      requestingUserId &&
+      !isAdmin &&
+      requestingUserId !== transaction.userId
+    ) {
+      throw new ForbiddenException(
+        "You do not have permission to view this transaction",
+      );
+    }
+
+    const isOwnerOrAdmin =
+      isAdmin ||
+      (Boolean(requestingUserId) && requestingUserId === transaction.userId);
+
+    // Helpers to mask PII if requested anonymously
+    const maskEmail = (email?: string | null): string | null => {
+      if (!email) return null;
+      const parts = email.split("@");
+      if (parts.length !== 2) return "***";
+      const [u, domain] = parts;
+      if (u.length <= 2) return `${u[0]}***@${domain}`;
+      return `${u.slice(0, 2)}***@${domain}`;
+    };
+
+    const maskName = (name?: string | null): string => {
+      if (!name) return "Learner";
+      const words = name.trim().split(/\s+/);
+      return words
+        .map((w) =>
+          w.length > 1 ? `${w[0]}${"*".repeat(Math.min(w.length - 1, 5))}` : w,
+        )
+        .join(" ");
+    };
+
+    const fallbackPlan = PLAN_CONFIGS[transaction.planToBuy];
+
+    let features: string[] = [];
+    if (transaction.plan?.features) {
+      if (Array.isArray(transaction.plan.features)) {
+        features = transaction.plan.features as string[];
+      } else if (typeof transaction.plan.features === "string") {
+        try {
+          features = JSON.parse(transaction.plan.features);
+        } catch {
+          features = fallbackPlan?.features || [];
+        }
+      }
+    } else {
+      features = fallbackPlan?.features || [];
+    }
+
+    const planDetails = {
+      planType: transaction.planToBuy,
+      title:
+        transaction.plan?.title || fallbackPlan?.title || transaction.planToBuy,
+      description:
+        transaction.plan?.description || fallbackPlan?.description || "",
+      category: transaction.plan?.category || fallbackPlan?.category,
+      price: Number(
+        transaction.plan?.price ?? fallbackPlan?.price ?? transaction.amount,
+      ),
+      currency:
+        transaction.plan?.currency ||
+        fallbackPlan?.currency ||
+        transaction.currency,
+      features,
+    };
+
+    const rawCustomerName =
+      transaction.user?.fullName ||
+      [transaction.user?.firstName, transaction.user?.lastName]
+        .filter(Boolean)
+        .join(" ") ||
+      "Mokushi Learner";
+
+    const customer = {
+      name: isOwnerOrAdmin ? rawCustomerName : maskName(rawCustomerName),
+      email: isOwnerOrAdmin
+        ? transaction.user?.email || null
+        : maskEmail(transaction.user?.email),
+    };
+
+    const payload = (transaction.gatewayPayload || {}) as Record<string, any>;
+    const gatewayDetails = {
+      bankTranId: payload?.bank_tran_id || payload?.bank_txn_id || null,
+      cardType:
+        payload?.card_type ||
+        payload?.card_issuer ||
+        transaction.paymentMethod ||
+        null,
+      cardBrand: payload?.card_brand || null,
+      cardIssuer: payload?.card_issuer || null,
+    };
+
+    const isSuccess = transaction.status === TransactionStatus.SUCCESS;
+    const isFailed = transaction.status === TransactionStatus.FAILED;
+    const isCancelled = transaction.status === TransactionStatus.CANCELLED;
+    const isPending = transaction.status === TransactionStatus.PENDING;
+
+    let failureReason: string | null = null;
+    if (isFailed) {
+      failureReason =
+        payload?.failedreason ||
+        payload?.error ||
+        "Payment was declined or failed at the payment gateway.";
+    } else if (isCancelled) {
+      failureReason = "Payment was cancelled by the user.";
+    }
+
+    let message = "";
+    switch (transaction.status) {
+      case TransactionStatus.SUCCESS:
+        message = `Payment completed successfully! Your ${planDetails.title} plan is now active.`;
+        break;
+      case TransactionStatus.FAILED:
+        message =
+          failureReason ||
+          "Payment was unsuccessful or declined. You have not been charged.";
+        break;
+      case TransactionStatus.CANCELLED:
+        message = "Payment was cancelled. You have not been charged.";
+        break;
+      case TransactionStatus.PENDING:
+        message =
+          "Payment is currently pending verification. Please refresh in a few moments.";
+        break;
+    }
+
+    // Access summary
+    let accessSummary: {
+      hasN5: boolean;
+      hasN4: boolean;
+      hasRapidFireN5: boolean;
+      hasRapidFireN4: boolean;
+    } | null = null;
+
+    if (isSuccess || isOwnerOrAdmin) {
+      const userPurchases =
+        (await this.databaseService.userPurchase.findMany({
+          where: { userId: transaction.userId },
+        })) || [];
+
+      accessSummary = {
+        hasN5: userPurchases.some(
+          (p) =>
+            p.planType === PlanType.N5 ||
+            p.planType === PlanType.N5_N4_BUNDLE ||
+            p.planType === PlanType.N5_RAPID_FIRE_BUNDLE,
+        ),
+        hasN4: userPurchases.some(
+          (p) =>
+            p.planType === PlanType.N4 ||
+            p.planType === PlanType.N5_N4_BUNDLE ||
+            p.planType === PlanType.N4_RAPID_FIRE_BUNDLE,
+        ),
+        hasRapidFireN5: userPurchases.some(
+          (p) =>
+            p.planType === PlanType.RAPID_FIRE_N5 ||
+            p.planType === PlanType.N5_RAPID_FIRE_BUNDLE,
+        ),
+        hasRapidFireN4: userPurchases.some(
+          (p) =>
+            p.planType === PlanType.RAPID_FIRE_N4 ||
+            p.planType === PlanType.N4_RAPID_FIRE_BUNDLE,
+        ),
+      };
+    }
+
+    return {
+      tranId: transaction.tranId,
+      valId: transaction.valId || null,
+      status: transaction.status,
+      isSuccess,
+      isFailed,
+      isCancelled,
+      isPending,
+      amount: Number(transaction.amount),
+      currency: transaction.currency,
+      paymentMethod: transaction.paymentMethod,
+      plan: planDetails,
+      customer,
+      message,
+      failureReason,
+      gatewayDetails: isOwnerOrAdmin
+        ? gatewayDetails
+        : { cardType: gatewayDetails.cardType },
+      accessSummary,
+      purchasedAt:
+        transaction.purchase?.purchasedAt ||
+        (isSuccess ? transaction.updatedAt : null),
+      createdAt: transaction.createdAt,
+      updatedAt: transaction.updatedAt,
+    };
   }
 
   async adminGetSubscriptions(params: {
@@ -668,10 +1027,14 @@ export class PaymentsService {
           create: {
             userId: dto.userId,
             planType: dto.planType,
-            ...(updatedOrCreatedTx.id && { transactionId: updatedOrCreatedTx.id }),
+            ...(updatedOrCreatedTx.id && {
+              transactionId: updatedOrCreatedTx.id,
+            }),
           },
           update: {
-            ...(updatedOrCreatedTx.id && { transactionId: updatedOrCreatedTx.id }),
+            ...(updatedOrCreatedTx.id && {
+              transactionId: updatedOrCreatedTx.id,
+            }),
           },
         });
 

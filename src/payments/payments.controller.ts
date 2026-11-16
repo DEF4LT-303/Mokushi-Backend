@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -24,15 +25,23 @@ import {
   ApiUnauthorizedResponse,
 } from "@nestjs/swagger";
 import { SkipThrottle, Throttle } from "@nestjs/throttler";
-import { PlanCategory, PlanType, Role, TransactionStatus } from "@prisma/client";
+import {
+  PlanCategory,
+  PlanType,
+  Role,
+  TransactionStatus,
+} from "@prisma/client";
 import { Response } from "express";
 import { CurrentUser } from "src/auth/decorators/current-user.decorator";
 import { Roles } from "src/auth/decorators/roles.decorator";
 import { JwtGuard } from "src/auth/guards/jwt.guard";
+import { OptionalJwtGuard } from "src/auth/guards/optional-jwt.guard";
 import { RolesGuard } from "src/auth/guards/roles.guard";
 import { AdminInvalidatePurchaseDto } from "./dto/admin-invalidate-purchase.dto";
 import { AdminValidatePurchaseDto } from "./dto/admin-validate-purchase.dto";
 import { InitiatePaymentDto } from "./dto/initiate-payment.dto";
+import { PaymentStatusResponseDto } from "./dto/payment-status-response.dto";
+import { QueryPaymentStatusDto } from "./dto/query-payment-status.dto";
 import { QueryPlansDto } from "./dto/query-plans.dto";
 import { UpdatePaymentPlanDto } from "./dto/update-payment-plan.dto";
 import { PaymentsService } from "./payments.service";
@@ -139,7 +148,8 @@ export class PaymentsController {
     @Query() query?: Record<string, any>,
   ) {
     const tranId = body?.tran_id || query?.tran_id;
-    await this.paymentsService.handlePaymentFailure(tranId);
+    const payload = { ...query, ...body };
+    await this.paymentsService.handlePaymentFailure(tranId, payload);
 
     const redirectUrl = this.paymentsService.getFrontendRedirectUrl(
       "failed",
@@ -172,7 +182,8 @@ export class PaymentsController {
     @Query() query?: Record<string, any>,
   ) {
     const tranId = body?.tran_id || query?.tran_id;
-    await this.paymentsService.handlePaymentCancel(tranId);
+    const payload = { ...query, ...body };
+    await this.paymentsService.handlePaymentCancel(tranId, payload);
 
     const redirectUrl = this.paymentsService.getFrontendRedirectUrl(
       "cancelled",
@@ -216,12 +227,118 @@ export class PaymentsController {
         cardType,
       );
     } else if (status === "FAILED") {
-      await this.paymentsService.handlePaymentFailure(tranId);
+      await this.paymentsService.handlePaymentFailure(tranId, data);
     } else if (status === "CANCELLED") {
-      await this.paymentsService.handlePaymentCancel(tranId);
+      await this.paymentsService.handlePaymentCancel(tranId, data);
     }
 
     return { message: "IPN received successfully" };
+  }
+
+  @Get("status/:tranId")
+  @UseGuards(OptionalJwtGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Get payment status and transaction details by transaction ID",
+  })
+  @ApiParam({
+    name: "tranId",
+    description: "The transaction ID (e.g. MK_1715891234567_4821)",
+  })
+  @ApiOkResponse({
+    type: PaymentStatusResponseDto,
+    description: "Transaction details returned successfully",
+  })
+  @ApiNotFoundResponse({ description: "Transaction not found" })
+  @ApiForbiddenResponse({
+    description: "Forbidden - user does not own this transaction",
+  })
+  async getPaymentStatus(
+    @Param("tranId") tranId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.paymentsService.getTransactionStatus(tranId, user);
+  }
+
+  @Get("status")
+  @UseGuards(OptionalJwtGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      "Get payment status and transaction details by query param (tran_id or tranId)",
+  })
+  @ApiOkResponse({
+    type: PaymentStatusResponseDto,
+    description: "Transaction details returned successfully",
+  })
+  @ApiNotFoundResponse({ description: "Transaction not found" })
+  @ApiForbiddenResponse({
+    description: "Forbidden - user does not own this transaction",
+  })
+  async getPaymentStatusByQuery(
+    @CurrentUser() user: any,
+    @Query() query: QueryPaymentStatusDto,
+  ) {
+    const tranId = query.tran_id || query.tranId;
+    if (!tranId) {
+      throw new BadRequestException(
+        "Transaction ID is required via 'tran_id' or 'tranId' query parameter",
+      );
+    }
+    return this.paymentsService.getTransactionStatus(tranId, user);
+  }
+
+  @Get("payment-status/:tranId")
+  @UseGuards(OptionalJwtGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary:
+      "Alias: Get payment status and transaction details by transaction ID",
+  })
+  @ApiParam({
+    name: "tranId",
+    description: "The transaction ID (e.g. MK_1715891234567_4821)",
+  })
+  @ApiOkResponse({
+    type: PaymentStatusResponseDto,
+    description: "Transaction details returned successfully",
+  })
+  @ApiNotFoundResponse({ description: "Transaction not found" })
+  @ApiForbiddenResponse({
+    description: "Forbidden - user does not own this transaction",
+  })
+  async getPaymentStatusAlias(
+    @Param("tranId") tranId: string,
+    @CurrentUser() user: any,
+  ) {
+    return this.paymentsService.getTransactionStatus(tranId, user);
+  }
+
+  @Get("payment-status")
+  @UseGuards(OptionalJwtGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: "Alias: Get payment status and transaction details by query param",
+  })
+  @ApiOkResponse({
+    type: PaymentStatusResponseDto,
+    description: "Transaction details returned successfully",
+  })
+  @ApiNotFoundResponse({ description: "Transaction not found" })
+  @ApiForbiddenResponse({
+    description: "Forbidden - user does not own this transaction",
+  })
+  async getPaymentStatusByQueryAlias(
+    @CurrentUser() user: any,
+    @Query() query: QueryPaymentStatusDto,
+  ) {
+    const tranId = query.tran_id || query.tranId;
+    if (!tranId) {
+      throw new BadRequestException(
+        "Transaction ID is required via 'tran_id' or 'tranId' query parameter",
+      );
+    }
+    return this.paymentsService.getTransactionStatus(tranId, user);
   }
 
   @Get("my-purchases")

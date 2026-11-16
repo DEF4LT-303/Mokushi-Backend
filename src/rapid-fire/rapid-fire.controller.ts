@@ -50,7 +50,8 @@ export class RapidFireController {
   @UseGuards(OptionalJwtGuard)
   @Get("lessons")
   @ApiOperation({
-    summary: "Get list of all rapid-fire lessons with word count and unlock status",
+    summary:
+      "Get list of all rapid-fire lessons with word count and unlock status",
   })
   @ApiOkResponse({
     type: [RapidFireLessonDto],
@@ -84,7 +85,8 @@ export class RapidFireController {
   @UseGuards(OptionalJwtGuard)
   @Get("lessons/:lessonId/words")
   @ApiOperation({
-    summary: "Fetch all vocabulary words for a rapid-fire lesson (study/flashcard mode)",
+    summary:
+      "Fetch all vocabulary words for a rapid-fire lesson (study/flashcard mode)",
   })
   @ApiParam({ name: "lessonId", description: "Rapid fire lesson ID" })
   @ApiOkResponse({
@@ -113,7 +115,8 @@ export class RapidFireController {
   @UseGuards(OptionalJwtGuard)
   @Get("words")
   @ApiOperation({
-    summary: "Search and query rapid-fire vocabulary words across lessons and levels",
+    summary:
+      "Search and query rapid-fire vocabulary words across lessons and levels",
   })
   @ApiOkResponse({
     description: "Paginated list of vocabulary words with lesson details",
@@ -168,7 +171,8 @@ export class RapidFireController {
   @UseGuards(JwtGuard)
   @Post("words/:wordId/toggle-hard")
   @ApiOperation({
-    summary: "Toggle hard/bookmarked status of a vocabulary word for current user",
+    summary:
+      "Toggle hard/bookmarked status of a vocabulary word for current user",
   })
   @ApiParam({ name: "wordId", description: "Rapid fire word ID" })
   @ApiBearerAuth()
@@ -245,7 +249,8 @@ export class RapidFireController {
   @UseGuards(JwtGuard)
   @Get("start/:lessonId")
   @ApiOperation({
-    summary: "Start a rapid-fire quiz session and return the lesson words and initial stats",
+    summary:
+      "Start a rapid-fire quiz session and return the lesson words and initial stats",
   })
   @ApiBearerAuth()
   @ApiUnauthorizedResponse({ description: "Unauthorized" })
