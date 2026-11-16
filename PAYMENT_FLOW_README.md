@@ -63,7 +63,7 @@ The payment system is built on **NestJS**, **Prisma ORM (MySQL)**, and **SSLComm
                                      │
                                      ▼
    4. HTTP 302 Redirect to Frontend:
-      `${FRONTEND_URL}/payment-status?status=success&tran_id=${tranId}`
+      `${FRONTEND_URL}/payments/payment-status?status=success&tran_id=${tranId}`
 ```
 
 ---
@@ -197,21 +197,29 @@ Returns transaction history for the authenticated user.
 #### `POST /api/payments/success`
 SSLCommerz browser redirect endpoint on successful payment.
 - Validates transaction, updates status, provisions purchase, and redirects user to:
-  `${FRONTEND_URL}/payment-status?status=success&tran_id=${tranId}`
+  `${FRONTEND_URL}/payments/payment-status?status=success&tran_id=${tranId}`
 
 #### `POST /api/payments/fail`
 SSLCommerz browser redirect endpoint on failed payment.
 - Updates status to `FAILED` and redirects user to:
-  `${FRONTEND_URL}/payment-status?status=failed&tran_id=${tranId}`
+  `${FRONTEND_URL}/payments/payment-status?status=failed&tran_id=${tranId}`
 
 #### `POST /api/payments/cancel`
 SSLCommerz browser redirect endpoint on cancelled payment.
 - Updates status to `CANCELLED` and redirects user to:
-  `${FRONTEND_URL}/payment-status?status=cancelled&tran_id=${tranId}`
+  `${FRONTEND_URL}/payments/payment-status?status=cancelled&tran_id=${tranId}`
 
 #### `POST /api/payments/ipn`
 SSLCommerz Instant Payment Notification (IPN) server-to-server webhook.
 - Asynchronously processes payment confirmation or failure.
+
+#### `GET /api/payments/status/:tranId` & `GET /api/payments/status?tran_id={tranId}`
+Fetch comprehensive payment status and transaction details for the frontend `/payments/payment-status` page.
+- **Route Param or Query**: `tranId` as route param, or `tran_id` / `tranId` as query param.
+- **Auth**: Optional JWT (`OptionalJwtGuard`). If authenticated, verifies ownership (or ADMIN role) and returns full customer information and updated content access summary. If unauthenticated, safely returns transaction status and plan info while masking customer PII.
+- **Auto-Reconciliation**: If the transaction is still `PENDING` when queried, performs a live gateway query against SSLCommerz to validate and fulfill in real time if paid.
+- **Response**: Status (`SUCCESS`, `FAILED`, `CANCELLED`, `PENDING`), boolean flags (`isSuccess`, `isFailed`, `isCancelled`, `isPending`), amount, currency, payment method, plan details, user-friendly `message`, `failureReason`, `gatewayDetails`, `accessSummary`, and timestamps.
+- **Aliases**: Also available at `/api/payments/payment-status/:tranId` and `/api/payments/payment-status`.
 
 ---
 

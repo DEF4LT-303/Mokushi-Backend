@@ -32,7 +32,10 @@ export class RapidFireWordDetailDto extends RapidFireWordDto {
   @ApiPropertyOptional({ description: "Lesson title" })
   lessonTitle?: string;
 
-  @ApiPropertyOptional({ description: "Lesson number within the set", example: 1 })
+  @ApiPropertyOptional({
+    description: "Lesson number within the set",
+    example: 1,
+  })
   lessonNumber?: number;
 
   @ApiPropertyOptional({ enum: JlptLevel, description: "JLPT Level" })
